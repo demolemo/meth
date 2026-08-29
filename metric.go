@@ -33,16 +33,13 @@ const (
 	DayInterval
 )
 
+// Main structure of the program, responsible for storing metric values
 type Metric struct {
 	// Unique field that helps to identify this metric
 	ID int `json:"id"`
 
 	// Human readable name that helps to identify the metric further
 	Name string `json:"name"`
-
-	// Aggregation fields that define the aggregation rules inside of this metric
-	AggRule     AggRule     `json:"aggRule"`
-	AggInterval AggInterval `json:"aggInterval"`
 
 	// Values that are stored inside of this metric
 	Values *[]MetricValue `json:"values,omitempty"`
@@ -64,6 +61,7 @@ func (m *Metric) Validate() error {
 	return nil
 }
 
+// anything that implements this interface can access the metric
 type MetricService interface {
 	// search metric by it's unique numeric ID, return ERRNOTFOUND
 	// if there is no metric with according numeric id
@@ -71,13 +69,19 @@ type MetricService interface {
 
 	// search metric by it's unique name, return ERRNOTFOUND
 	// if there is no metric with according name yo
-	FindMetricByName(name string) (*Metric, error)
+	// NOTE: i'm not sure that we need this thing because this creates a hassle with maintaining
+	// a set of metric names, for now it's commented out
+	// FindMetricByName(name string) (*Metric, error)
 
 	// pass a built metric so it could be recorded somewhere
-	// bad comment, lack of an understanding
+	// where does the metric id come from? from some outer service?
+	// do we validate that the name is unique on this stage?
 	CreateMetric(metric *Metric)
 
-	// updates a given metric with new params, should we return new metric here? prolly not
+	// generate a report with aggregated values
+	GenerateMetricReport(id int, aggRule AggRule, aggInterval AggInterval) (MetricReport, error)
+
+	// updates a given metric with new params
 	UpdateMetric(id int, upd MetricUpdate) (*Metric, error)
 
 	// deletes a given metric and all values attached to it?
@@ -86,7 +90,24 @@ type MetricService interface {
 }
 
 type MetricUpdate struct {
-	Name        string
-	AggRule     AggRule
-	AggInterval AggInterval
+	Name string
+}
+
+// creating the aggregation values of the metric according to the metric rules
+// this solves the issue with stroring aggregated values - we don't store them at all!
+type MetricReport struct {
+	// ID - later we can think about some kind of id field that will help caching requests with the same params
+	// Name of the metric that produced that report
+	Name string `json:"name"`
+
+	// Rules which were applied to the underlying metric to arrive to this values
+	// Hmmm, maybe we don't even need to store aggrule and agginterval near the metric.
+	// metric is just raw values, that is implicit. i love that line of thinking
+
+	// Aggregation fields that define the aggregation rules inside of this metric
+	AggRule     AggRule     `json:"aggRule"`
+	AggInterval AggInterval `json:"aggInterval"`
+
+	// aggregated values according to aggregation rules above
+	AggValues *[]MetricValue `json:"aggValues"`
 }
