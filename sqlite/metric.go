@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"database/sql"
+
+	"github.com/demolemo/meth"
 )
 
 type MetricService struct {

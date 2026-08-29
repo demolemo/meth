@@ -1,16 +1,24 @@
 package main
 
-import "flag"
-
-type MetricCreator struct{}
+import (
+	"errors"
+	"flag"
+	"fmt"
+)
 
 // first version of the command, create without the flags
 // name - if missing we fail
-func Run(args []string) error {
+type MetricCreateCommand struct{}
+
+func (c *MetricCreateCommand) Run(args []string) error {
 	fs := flag.NewFlagSet("metric-create", flag.ContinueOnError)
 	name := fs.String("name", "", "Give this metric a name will ya")
-	metricService := NewDialService()
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
-	_ = name
-	return nil
+	if *name == "" {
+		return errors.New("Name could not be empty")
+	}
+	return fmt.Errorf("current name is: %s", *name)
 }
