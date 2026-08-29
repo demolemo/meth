@@ -9,13 +9,13 @@ type MetricValue struct {
 	ID int `json:"ID"`
 
 	// value of the metric itself. float32 for now, don't see the point to make it more dense
-	Value float32 `json:"Value"`
+	Value float32 `json:"value"`
 
 	// fields that help to identify the parent metric this value belongs to
-	MetricID int `json:"MetricID"`
-	Metric   *Metric
+	MetricID int     `json:"metricID"`
+	Metric   *Metric `json:"metric"`
 
 	// time related metrics
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
