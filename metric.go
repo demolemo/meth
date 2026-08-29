@@ -2,6 +2,7 @@ package meth
 
 import (
 	"errors"
+	"fmt"
 	"time"
 	"unicode/utf8"
 )
@@ -79,7 +80,7 @@ type MetricService interface {
 	CreateMetric(metric *Metric)
 
 	// generate a report with aggregated values
-	GenerateMetricReport(id int, aggRule AggRule, aggInterval AggInterval) (MetricReport, error)
+	GenerateMetricReport(id int, aggRule AggRule, aggInterval AggInterval) (MetricValueReport, error)
 
 	// updates a given metric with new params
 	UpdateMetric(id int, upd MetricUpdate) (*Metric, error)
@@ -93,9 +94,9 @@ type MetricUpdate struct {
 	Name string
 }
 
-// creating the aggregation values of the metric according to the metric rules
-// this solves the issue with stroring aggregated values - we don't store them at all!
-type MetricReport struct {
+// creating the aggregation values of the metric according to passed rules
+// this solves the issue with storing aggregated values - we don't store them at all!
+type MetricValueReport struct {
 	// ID - later we can think about some kind of id field that will help caching requests with the same params
 	// Name of the metric that produced that report
 	Name string `json:"name"`
@@ -109,5 +110,21 @@ type MetricReport struct {
 	AggInterval AggInterval `json:"aggInterval"`
 
 	// aggregated values according to aggregation rules above
-	AggValues *[]MetricValue `json:"aggValues"`
+	// is storing time a good idea here? maybe we can store ints instead?
+	// we will try doing it that way first
+	Records []MetricValueRecord `json:"aggValues"`
+}
+
+// MetricValueRecord represents an average metric value at a given point in time
+// for the MetricValueReport.
+// this is done so that we are not storing maps in there
+type MetricValueRecord struct {
+	Value     float32   `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// GoString prints a more easily readable representation for debugging.
+// The timestamp field is represented as an RFC 3339 string instead of a pointer.
+func (r *MetricValueRecord) GoString() string {
+	return fmt.Sprintf("&meth.MetricValueRecord{Value:%d, Timestamp:%q}", r.Value, r.Timestamp.Format(time.RFC3339))
 }
