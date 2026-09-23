@@ -55,7 +55,7 @@ func createMetric(db *sql.DB, m *Metric) (int64, error) {
 	return rowsAffected, nil
 }
 
-func findMetricByID(db *sql.DB, id int) (*Metric, error) {
+func getMetricByID(db *sql.DB, id int) (*Metric, error) {
 	sqlQuery := `
 		SELECT * FROM metrics WHERE id = $id
 	`
@@ -78,10 +78,46 @@ func findMetricByID(db *sql.DB, id int) (*Metric, error) {
 	return nil, nil
 }
 
+func getMetrics(db *sql.DB) ([]*Metric, error) {
+	sqlQuery := `
+		SELECT id, name FROM metrics
+	`
+	rows, err := db.Query(sqlQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mets []*Metric
+	for rows.Next() {
+		m := &Metric{}
+		if err := rows.Scan(&m.ID, &m.Name); err != nil {
+			return mets, err
+		}
+		mets = append(mets, m)
+	}
+	return mets, nil
+}
+
 func updateMetricByID(db *sql.DB, mu *MetricUpdate) (int64, error) {
 	// do a check that metric exists first, for now we assume that it does
 	sqlQuery := `UPDATE metrics SET name = $1 WHERE id = $2`
 	res, err := db.Exec(sqlQuery, mu.Name, mu.ID)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, nil
+	}
+	return rowsAffected, nil
+}
+
+// solve the question with MetricValues. Do we need to delete values before the metric?
+// are we working with values separately or we deleting them beforehand
+func deleteMetricByID(db *sql.DB, id int) (int64, error) {
+	sqlQuery := `DELETE FROM metrics WHERE id = $id`
+	res, err := db.Exec(sqlQuery, id)
 	if err != nil {
 		return 0, err
 	}
@@ -107,6 +143,18 @@ func main() {
 	}
 	defer db.Close()
 
+	// os.Args cannot have length 0 becuase it's always at least the program name
+	if len(os.Args) == 1 {
+		fmt.Print(`METH (METrics Health): stupid little program to track metrics:
+	-find: find ID
+	-create: create ID name
+	-update: update ID new-name
+	-delete: delete ID
+	-list: list
+`)
+		return
+	}
+
 	if os.Args[1] == "find" {
 		if len(os.Args[2:]) != 1 {
 			fmt.Printf("usage: find ID\n")
@@ -117,7 +165,7 @@ func main() {
 				fmt.Printf("Following error has occured: %s\n", err.Error())
 				return
 			}
-			met, err := findMetricByID(db, id)
+			met, err := getMetricByID(db, id)
 			if err != nil {
 				fmt.Printf("Following error has occured: %s\n", err.Error())
 				return
@@ -140,7 +188,7 @@ func main() {
 
 			rowsAffected, err := createMetric(db, met)
 			if err != nil {
-				fmt.Printf("Follwing error has occured: %s\n", err.Error())
+				fmt.Printf("Following error has occured: %s\n", err.Error())
 				return
 			}
 
@@ -162,11 +210,54 @@ func main() {
 
 			rowsAffected, err := updateMetricByID(db, mu)
 			if err != nil {
-				fmt.Printf("Follwing error has occured: %s\n", err.Error())
+				fmt.Printf("Following error has occured: %s\n", err.Error())
 				return
 			}
 
 			fmt.Printf("Metric created, rows affected: %d\n", rowsAffected)
+			return
+		}
+	} else if os.Args[1] == "list" {
+		if len(os.Args[2:]) != 0 {
+			fmt.Printf("usage: list\n")
+		} else {
+			mets, err := getMetrics(db)
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+
+			if len(mets) > 5 {
+				fmt.Printf("Following metrics exist (cut to first 5):\n")
+				for i := range 5 {
+					fmt.Printf("\tMetric, ID: %d, Name: %s\n", mets[i].ID, mets[i].Name)
+				}
+				return
+			} else {
+				fmt.Printf("Following metrics exist:\n")
+				for _, m := range mets {
+					fmt.Printf("\tMetric, ID: %d, Name: %s\n", m.ID, m.Name)
+				}
+				return
+			}
+		}
+	} else if os.Args[1] == "delete" {
+		if len(os.Args[2:]) != 1 {
+			fmt.Printf("usage: delete ID\n")
+			return
+		} else {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+			rowsAffected, err := deleteMetricByID(db, id)
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+
+			fmt.Printf("Metric deleted, rows affected: %d\n", rowsAffected)
 			return
 		}
 	} else {
