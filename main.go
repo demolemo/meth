@@ -38,6 +38,7 @@ type Metric struct {
 }
 
 type MetricUpdate struct {
+	ID   int
 	Name string
 }
 
@@ -77,8 +78,18 @@ func findMetricByID(db *sql.DB, id int) (*Metric, error) {
 	return nil, nil
 }
 
-func updateMetric(db *sql.DB, m *MetricUpdate) (int64, error) {
-	return 0, nil
+func updateMetricByID(db *sql.DB, mu *MetricUpdate) (int64, error) {
+	// do a check that metric exists first, for now we assume that it does
+	sqlQuery := `UPDATE metrics SET name = $1 WHERE id = $2`
+	res, err := db.Exec(sqlQuery, mu.Name, mu.ID)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, nil
+	}
+	return rowsAffected, nil
 }
 
 type MetricValue struct {
@@ -128,6 +139,28 @@ func main() {
 			met := &Metric{ID: id, Name: name}
 
 			rowsAffected, err := createMetric(db, met)
+			if err != nil {
+				fmt.Printf("Follwing error has occured: %s\n", err.Error())
+				return
+			}
+
+			fmt.Printf("Metric created, rows affected: %d\n", rowsAffected)
+			return
+		}
+	} else if os.Args[1] == "update" {
+		if len(os.Args[2:]) != 2 {
+			fmt.Printf("usage: update ID new-name\n")
+			return
+		} else {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+			name := os.Args[3]
+			mu := &MetricUpdate{ID: id, Name: name}
+
+			rowsAffected, err := updateMetricByID(db, mu)
 			if err != nil {
 				fmt.Printf("Follwing error has occured: %s\n", err.Error())
 				return
