@@ -144,6 +144,19 @@ func UpdateMetricValue(db *sql.DB, mv *MetricValue) (int64, error) {
 	return rowsAffected, nil
 }
 
+func DeleteMetricValueByID(db *sql.DB, id int) (int64, error) {
+	sqlQuery := `DELETE FROM metric_values WHERE id = $1`
+	res, err := db.Exec(sqlQuery, id)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rowsAffected, nil
+}
+
 // newest first. limit < 0 means no limit
 func GetMetricValues(db *sql.DB, metricID int, limit int) ([]*MetricValue, error) {
 	sqlQuery := `

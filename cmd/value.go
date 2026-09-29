@@ -93,6 +93,22 @@ var valueListCmd = &cobra.Command{
 	},
 }
 
+var valueDeleteValueID int
+
+var valueDeleteCmd = &cobra.Command{
+	Use:   "delete",
+	Short: "Delete a value by its ID",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		rowsAffected, err := store.DeleteMetricValueByID(db, valueDeleteValueID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Value deleted, rows affected: %d\n", rowsAffected)
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(valueCmd)
 
@@ -120,4 +136,8 @@ func init() {
 	valueListCmd.Flags().IntVar(&valueListMetricID, "id", 0, "metric ID")
 	valueListCmd.Flags().IntVar(&valueListLimit, "limit", 5, "max values to show, -1 for all")
 	valueListCmd.MarkFlagRequired("id")
+
+	valueCmd.AddCommand(valueDeleteCmd)
+	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "vid", 0, "value ID")
+	valueDeleteCmd.MarkFlagRequired("vid")
 }
