@@ -58,11 +58,11 @@ var valueUpdateCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		updatedAt := time.Now()
-		mv := &store.MetricValue{ID: valueUpdateValueID, MetricID: valueUpdateMetricID, Value: valueAddValue, UpdatedAt: updatedAt}
+		mv := &store.MetricValue{ID: valueUpdateValueID, MetricID: valueUpdateMetricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
 		if _, err := store.UpdateMetricValue(db, mv); err != nil {
 			return err
 		}
-		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(store.TimeLayout))
+		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, updatedAt: %s\n", mv.MetricID, mv.Value, mv.UpdatedAt.Format(store.TimeLayout))
 		return nil
 	},
 }
@@ -85,5 +85,11 @@ func init() {
 	valueUpdateCmd.Flags().Float64VarP(&valueUpdateValue, "value", "v", 0, "value to record")
 	valueUpdateCmd.MarkFlagRequired("mid")
 	valueUpdateCmd.MarkFlagRequired("vid")
-	valueUpdateCmd.MarkFlagRequired("v")
+	valueUpdateCmd.MarkFlagRequired("value")
+
+	// NOTE: this interface could be changed to:
+	// meth list - lists all of the metrics inside of the application
+	// meth metric list - lists all the values (however, we have to pass the metric-id the either way)
+	// valueCmd.AddCommand(valueListCmd)
+	// valueListCmd.Flags().IntVar(&valueListMetricID, "id", 0, "metric ID")
 }

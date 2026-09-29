@@ -132,7 +132,7 @@ func UpdateMetricValue(db *sql.DB, mv *MetricValue) (int64, error) {
 		return 0, err
 	}
 	// NOTE: we can avoid checking here because the query will do implicit checking
-	sqlQuery := `UPDATE values SET value = $1, updated_at = $2 where id = $3 AND metric_id = $4`
+	sqlQuery := `UPDATE metric_values SET value = $1, updated_at = $2 where id = $3 AND metric_id = $4`
 	res, err := db.Exec(sqlQuery, mv.Value, mv.UpdatedAt, mv.ID, mv.MetricID)
 	if err != nil {
 		return 0, err
