@@ -67,6 +67,32 @@ var valueUpdateCmd = &cobra.Command{
 	},
 }
 
+var (
+	valueListMetricID int
+	valueListLimit    int
+)
+
+var valueListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List values of a metric, newest first",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		mvs, err := store.GetMetricValues(db, valueListMetricID, valueListLimit)
+		if err != nil {
+			return err
+		}
+		if len(mvs) == 0 {
+			fmt.Printf("No values for metric %d\n", valueListMetricID)
+			return nil
+		}
+		fmt.Printf("Values of metric %d:\n", valueListMetricID)
+		for _, mv := range mvs {
+			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(store.TimeLayout))
+		}
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(valueCmd)
 
@@ -90,6 +116,8 @@ func init() {
 	// NOTE: this interface could be changed to:
 	// meth list - lists all of the metrics inside of the application
 	// meth metric list - lists all the values (however, we have to pass the metric-id the either way)
-	// valueCmd.AddCommand(valueListCmd)
-	// valueListCmd.Flags().IntVar(&valueListMetricID, "id", 0, "metric ID")
+	valueCmd.AddCommand(valueListCmd)
+	valueListCmd.Flags().IntVar(&valueListMetricID, "id", 0, "metric ID")
+	valueListCmd.Flags().IntVar(&valueListLimit, "limit", 5, "max values to show, -1 for all")
+	valueListCmd.MarkFlagRequired("id")
 }
