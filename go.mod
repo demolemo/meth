@@ -1,4 +1,4 @@
-module checking
+module meth
 
 go 1.23.4
 

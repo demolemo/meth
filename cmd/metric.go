@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"checking/store"
+	"meth/store"
 
 	"github.com/spf13/cobra"
 )

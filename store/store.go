@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -48,7 +49,7 @@ func GetMetricByID(db *sql.DB, id int) (*Metric, error) {
 			return &Metric{ID: id, Name: name}, nil
 		}
 	}
-	return nil, nil
+	return nil, errors.New("err not found") // reuse this error in several places
 }
 
 func GetMetrics(db *sql.DB) ([]*Metric, error) {
@@ -118,6 +119,24 @@ func CreateMetricValue(db *sql.DB, mv *MetricValue) (int64, error) {
 		return 0, err
 	}
 
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rowsAffected, nil
+}
+
+func UpdateMetricValue(db *sql.DB, mv *MetricValue) (int64, error) {
+	_, err := GetMetricByID(db, mv.MetricID)
+	if err != nil {
+		return 0, err
+	}
+	// NOTE: we can avoid checking here because the query will do implicit checking
+	sqlQuery := `UPDATE values SET value = $1, updated_at = $2 where id = $3 AND metric_id = $4`
+	res, err := db.Exec(sqlQuery, mv.Value, mv.UpdatedAt, mv.ID, mv.MetricID)
+	if err != nil {
+		return 0, err
+	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
 		return 0, err
