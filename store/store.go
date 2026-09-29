@@ -81,7 +81,7 @@ func UpdateMetricByID(db *sql.DB, mu *MetricUpdate) (int64, error) {
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	return rowsAffected, nil
 }
@@ -96,7 +96,7 @@ func DeleteMetricByID(db *sql.DB, id int) (int64, error) {
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	return rowsAffected, nil
 }
