@@ -144,6 +144,31 @@ func UpdateMetricValue(db *sql.DB, mv *MetricValue) (int64, error) {
 	return rowsAffected, nil
 }
 
+// newest first. limit < 0 means no limit
+func GetMetricValues(db *sql.DB, metricID int, limit int) ([]*MetricValue, error) {
+	sqlQuery := `
+		SELECT id, metric_id, value, created_at, updated_at FROM metric_values
+		WHERE metric_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+	rows, err := db.Query(sqlQuery, metricID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mvs []*MetricValue
+	for rows.Next() {
+		mv := &MetricValue{}
+		if err := rows.Scan(&mv.ID, &mv.MetricID, &mv.Value, &mv.CreatedAt, &mv.UpdatedAt); err != nil {
+			return mvs, err
+		}
+		mvs = append(mvs, mv)
+	}
+	return mvs, rows.Err()
+}
+
 // weight and steps don't need exact seconds
 const TimeLayout = "2006-01-02 15:04"
 
