@@ -2,23 +2,23 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 
 	"checking/store"
 
 	"github.com/spf13/cobra"
 )
 
+var (
+	metricCreateID   int
+	metricCreateName string
+)
+
 var metricCreateCmd = &cobra.Command{
-	Use:   "create ID name",
+	Use:   "create",
 	Short: "Create a metric",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := strconv.Atoi(args[0])
-		if err != nil {
-			return err
-		}
-		rowsAffected, err := store.CreateMetric(db, &store.Metric{ID: id, Name: args[1]})
+		rowsAffected, err := store.CreateMetric(db, &store.Metric{ID: metricCreateID, Name: metricCreateName})
 		if err != nil {
 			return err
 		}
@@ -29,4 +29,8 @@ var metricCreateCmd = &cobra.Command{
 
 func init() {
 	metricCmd.AddCommand(metricCreateCmd)
+	metricCreateCmd.Flags().IntVar(&metricCreateID, "id", 0, "metric ID")
+	metricCreateCmd.Flags().StringVar(&metricCreateName, "name", "", "metric name")
+	metricCreateCmd.MarkFlagRequired("id")
+	metricCreateCmd.MarkFlagRequired("name")
 }

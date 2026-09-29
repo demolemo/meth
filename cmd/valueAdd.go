@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"checking/store"
@@ -10,27 +9,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	valueAddID    int
+	valueAddValue float64
+	valueAddAt    string
+)
+
 var valueAddCmd = &cobra.Command{
-	Use:   `add ID value ["2006-01-02 15:04"]`,
-	Short: "Add a value to a metric (created_at defaults to now)",
-	Args:  cobra.RangeArgs(2, 3),
+	Use:   "add",
+	Short: "Add a value to a metric",
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := strconv.Atoi(args[0])
-		if err != nil {
-			return err
-		}
-		value, err := strconv.ParseFloat(args[1], 64)
-		if err != nil {
-			return err
-		}
 		createdAt := time.Now()
-		if len(args) == 3 {
-			createdAt, err = store.ParseTime(args[2])
+		if cmd.Flags().Changed("at") {
+			var err error
+			createdAt, err = store.ParseTime(valueAddAt)
 			if err != nil {
 				return err
 			}
 		}
-		mv := &store.MetricValue{MetricID: id, Value: value, CreatedAt: createdAt}
+		mv := &store.MetricValue{MetricID: valueAddID, Value: valueAddValue, CreatedAt: createdAt}
 		if _, err := store.CreateMetricValue(db, mv); err != nil {
 			return err
 		}
@@ -41,4 +39,9 @@ var valueAddCmd = &cobra.Command{
 
 func init() {
 	valueCmd.AddCommand(valueAddCmd)
+	valueAddCmd.Flags().IntVar(&valueAddID, "id", 0, "metric ID")
+	valueAddCmd.Flags().Float64Var(&valueAddValue, "value", 0, "value to record")
+	valueAddCmd.Flags().StringVar(&valueAddAt, "at", "", `created_at, "2006-01-02 15:04" (default now)`)
+	valueAddCmd.MarkFlagRequired("id")
+	valueAddCmd.MarkFlagRequired("value")
 }

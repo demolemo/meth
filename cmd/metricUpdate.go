@@ -2,23 +2,23 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 
 	"checking/store"
 
 	"github.com/spf13/cobra"
 )
 
+var (
+	metricUpdateID   int
+	metricUpdateName string
+)
+
 var metricUpdateCmd = &cobra.Command{
-	Use:   "update ID new-name",
+	Use:   "update",
 	Short: "Rename a metric",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := strconv.Atoi(args[0])
-		if err != nil {
-			return err
-		}
-		rowsAffected, err := store.UpdateMetricByID(db, &store.MetricUpdate{ID: id, Name: args[1]})
+		rowsAffected, err := store.UpdateMetricByID(db, &store.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
 		if err != nil {
 			return err
 		}
@@ -29,4 +29,8 @@ var metricUpdateCmd = &cobra.Command{
 
 func init() {
 	metricCmd.AddCommand(metricUpdateCmd)
+	metricUpdateCmd.Flags().IntVar(&metricUpdateID, "id", 0, "metric ID")
+	metricUpdateCmd.Flags().StringVar(&metricUpdateName, "name", "", "new metric name")
+	metricUpdateCmd.MarkFlagRequired("id")
+	metricUpdateCmd.MarkFlagRequired("name")
 }
