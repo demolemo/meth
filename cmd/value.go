@@ -1,40 +1,54 @@
-/*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
 	"fmt"
+	"time"
+
+	"checking/store"
 
 	"github.com/spf13/cobra"
 )
 
-// valueCmd represents the value command
 var valueCmd = &cobra.Command{
 	Use:   "value",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Manage metric values",
+}
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("value called")
+var (
+	valueAddID    int
+	valueAddValue float64
+	valueAddAt    string
+)
+
+var valueAddCmd = &cobra.Command{
+	Use:   "add",
+	Short: "Add a value to a metric",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		createdAt := time.Now()
+		if cmd.Flags().Changed("at") {
+			var err error
+			createdAt, err = store.ParseTime(valueAddAt)
+			if err != nil {
+				return err
+			}
+		}
+		mv := &store.MetricValue{MetricID: valueAddID, Value: valueAddValue, CreatedAt: createdAt}
+		if _, err := store.CreateMetricValue(db, mv); err != nil {
+			return err
+		}
+		fmt.Printf("Metric value added nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(store.TimeLayout))
+		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(valueCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// valueCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// valueCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	valueCmd.AddCommand(valueAddCmd)
+	valueAddCmd.Flags().IntVar(&valueAddID, "id", 0, "metric ID")
+	valueAddCmd.Flags().Float64Var(&valueAddValue, "value", 0, "value to record")
+	valueAddCmd.Flags().StringVar(&valueAddAt, "at", "", `created_at, "2006-01-02 15:04" (default now)`)
+	valueAddCmd.MarkFlagRequired("id")
+	valueAddCmd.MarkFlagRequired("value")
 }
