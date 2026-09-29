@@ -47,7 +47,7 @@ func init() {
 
 	valueCmd.AddCommand(valueAddCmd)
 	valueAddCmd.Flags().IntVar(&valueAddID, "id", 0, "metric ID")
-	valueAddCmd.Flags().Float64Var(&valueAddValue, "value", 0, "value to record")
+	valueAddCmd.Flags().Float64VarP(&valueAddValue, "value", "v", 0, "value to record")
 	valueAddCmd.Flags().StringVar(&valueAddAt, "at", "", `created_at, "2006-01-02 15:04" (default now)`)
 	valueAddCmd.MarkFlagRequired("id")
 	valueAddCmd.MarkFlagRequired("value")

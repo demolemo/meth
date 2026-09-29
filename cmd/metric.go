@@ -113,7 +113,7 @@ func init() {
 
 	metricCmd.AddCommand(metricCreateCmd)
 	metricCreateCmd.Flags().IntVar(&metricCreateID, "id", 0, "metric ID")
-	metricCreateCmd.Flags().StringVar(&metricCreateName, "name", "", "metric name")
+	metricCreateCmd.Flags().StringVarP(&metricCreateName, "name", "n", "", "metric name")
 	metricCreateCmd.MarkFlagRequired("id")
 	metricCreateCmd.MarkFlagRequired("name")
 
@@ -123,7 +123,7 @@ func init() {
 
 	metricCmd.AddCommand(metricUpdateCmd)
 	metricUpdateCmd.Flags().IntVar(&metricUpdateID, "id", 0, "metric ID")
-	metricUpdateCmd.Flags().StringVar(&metricUpdateName, "name", "", "new metric name")
+	metricUpdateCmd.Flags().StringVarP(&metricUpdateName, "name", "n", "", "new metric name")
 	metricUpdateCmd.MarkFlagRequired("id")
 	metricUpdateCmd.MarkFlagRequired("name")
 
