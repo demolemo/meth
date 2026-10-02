@@ -1,17 +1,19 @@
 /*
 Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 */
-package cmd
+package main
 
 import (
 	"database/sql"
 	"os"
 
+	"github.com/demolemo/meth/sqlite"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 )
 
 // opened before any command runs, see PersistentPreRunE
+var ms *sqlite.MetricService
 var db *sql.DB
 
 // rootCmd represents the base command when called without any subcommands
@@ -19,12 +21,14 @@ var rootCmd = &cobra.Command{
 	Use:   "meth",
 	Short: "smol application for tracking METrics related to Health",
 	Long:  `smol application for tracking METrics related to Health`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		var err error
-		db, err = sql.Open("sqlite3", "test.db?_foreign_keys=on")
+		// db should be wired here temporarily just for testing
+		db, err := sql.Open("sqlite3", "test.db?_foreign_keys=on")
+		if err != nil {
+			return err
+		}
+		// metric service is wired for all commands
+		ms = sqlite.NewMetricService(db)
 		return err
 	},
 }
@@ -39,6 +43,7 @@ func Execute() {
 }
 
 func init() {
+	// NOTE: remove all that bullshit. that is legacy code from cobra
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.

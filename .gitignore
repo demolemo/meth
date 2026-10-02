@@ -1,2 +1,4 @@
 *.db
+# not sure if the previous pattern matches on tables that are inside dirs
+*/*.db 
 meth

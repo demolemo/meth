@@ -1,10 +1,10 @@
-package cmd
+package main
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/demolemo/meth/store"
+	"github.com/demolemo/meth"
 
 	"github.com/spf13/cobra"
 )
@@ -27,7 +27,7 @@ var metricCreateCmd = &cobra.Command{
 		if strings.TrimSpace(metricCreateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
-		rowsAffected, err := store.CreateMetric(db, &store.Metric{ID: metricCreateID, Name: metricCreateName})
+		rowsAffected, err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName})
 		if err != nil {
 			return err
 		}
@@ -43,7 +43,7 @@ var metricFindCmd = &cobra.Command{
 	Short: "Find a metric by ID",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		met, err := store.GetMetricByID(db, metricFindID)
+		met, err := ms.GetMetricByID(metricFindID)
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ var metricUpdateCmd = &cobra.Command{
 		if strings.TrimSpace(metricUpdateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
-		rowsAffected, err := store.UpdateMetricByID(db, &store.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
+		rowsAffected, err := ms.UpdateMetricByID(&meth.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ var metricDeleteCmd = &cobra.Command{
 	Short: "Delete a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		rowsAffected, err := store.DeleteMetricByID(db, metricDeleteID)
+		rowsAffected, err := ms.DeleteMetricByID(metricDeleteID)
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,8 @@ var metricListCmd = &cobra.Command{
 	Short: "List metrics (first 5)",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mets, err := store.GetMetrics(db)
+		// NOTE: change for a function with limit, repeat once again
+		mets, err := ms.GetMetrics()
 		if err != nil {
 			return err
 		}

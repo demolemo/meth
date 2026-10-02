@@ -1,10 +1,11 @@
-package cmd
+package main
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/demolemo/meth/store"
+	"github.com/demolemo/meth"
+	"github.com/demolemo/meth/sqlite"
 
 	"github.com/spf13/cobra"
 )
@@ -29,7 +30,7 @@ var valueAddCmd = &cobra.Command{
 		createdAt := time.Now()
 		if cmd.Flags().Changed("at") {
 			var err error
-			createdAt, err = store.ParseTime(valueAddAt)
+			createdAt, err = sqlite.ParseTime(valueAddAt)
 			if err != nil {
 				return err
 			}
@@ -38,11 +39,12 @@ var valueAddCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		mv := &store.MetricValue{MetricID: metricID, Value: valueAddValue, CreatedAt: createdAt}
-		if _, err := store.CreateMetricValue(db, mv); err != nil {
+		mv := &meth.MetricValue{MetricID: metricID, Value: valueAddValue, CreatedAt: createdAt}
+		// NOTE: change this in the next pass, this would not work later
+		if _, err := sqlite.CreateMetricValue(db, mv); err != nil {
 			return err
 		}
-		fmt.Printf("Metric value added nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(store.TimeLayout))
+		fmt.Printf("Metric value added nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(sqlite.TimeLayout))
 		return nil
 	},
 }
@@ -68,11 +70,11 @@ var valueUpdateCmd = &cobra.Command{
 			return err
 		}
 		updatedAt := time.Now()
-		mv := &store.MetricValue{ID: valueUpdateValueID, MetricID: metricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
-		if _, err := store.UpdateMetricValue(db, mv); err != nil {
+		mv := &meth.MetricValue{ID: valueUpdateValueID, MetricID: metricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
+		if _, err := sqlite.UpdateMetricValue(ms, mv); err != nil {
 			return err
 		}
-		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, updatedAt: %s\n", mv.MetricID, mv.Value, mv.UpdatedAt.Format(store.TimeLayout))
+		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, updatedAt: %s\n", mv.MetricID, mv.Value, mv.UpdatedAt.Format(sqlite.TimeLayout))
 		return nil
 	},
 }
@@ -92,7 +94,7 @@ var valueListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		mvs, err := store.GetMetricValues(db, metricID, valueListLimit)
+		mvs, err := sqlite.GetMetricValues(db, metricID, valueListLimit)
 		if err != nil {
 			return err
 		}
@@ -102,7 +104,7 @@ var valueListCmd = &cobra.Command{
 		}
 		fmt.Printf("Values of metric %d:\n", metricID)
 		for _, mv := range mvs {
-			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(store.TimeLayout))
+			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(sqlite.TimeLayout))
 		}
 		return nil
 	},
@@ -115,7 +117,7 @@ var valueDeleteCmd = &cobra.Command{
 	Short: "Delete a value by its ID",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		rowsAffected, err := store.DeleteMetricValueByID(db, valueDeleteValueID)
+		rowsAffected, err := sqlite.DeleteMetricValueByID(db, valueDeleteValueID)
 		if err != nil {
 			return err
 		}
@@ -129,7 +131,7 @@ func resolveMetricID(id int, name string) (int, error) {
 	if name == "" {
 		return id, nil
 	}
-	m, err := store.GetMetricByName(db, name)
+	m, err := ms.GetMetricByName(name)
 	if err != nil {
 		return 0, err
 	}
@@ -139,6 +141,24 @@ func resolveMetricID(id int, name string) (int, error) {
 	return m.ID, nil
 }
 
+//	var valueImportCmd = &cobra.Command{
+//		Use:   "import",
+//		Short: "Bulk import metric values",
+//		Args:  cobra.NoArgs,
+//		RunE: func(cmd *cobra.Command, args []string) error {
+//			// first parse - this is a separete interface inside of csv package. return metricValues
+//			// interface: accept path to the file, return metric values
+//			// secondly - get an array of metrics and pass them to the writer
+//			// interface writeMetrics(db, mvs) (int, err) where int is the number of errors that was written
+//			rowsAffected, err := reader.readMetricValues(db)
+//			rowsAffected, err := sqlite.DeleteMetricValueByID(db, valueDeleteValueID)
+//			if err != nil {
+//				return err
+//			}
+//			fmt.Printf("Value deleted, rows affected: %d\n", rowsAffected)
+//			return nil
+//		},
+//	}
 func init() {
 	rootCmd.AddCommand(valueCmd)
 
@@ -176,4 +196,7 @@ func init() {
 	valueCmd.AddCommand(valueDeleteCmd)
 	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "vid", 0, "value ID")
 	valueDeleteCmd.MarkFlagRequired("vid")
+
+	// valueCmd.AddCommand(valueImportCmd)
+	// valueImportCmd.Flags().StringVarP(%)
 }
