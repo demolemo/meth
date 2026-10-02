@@ -52,6 +52,21 @@ func GetMetricByID(db *sql.DB, id int) (*Metric, error) {
 	return nil, errors.New("err not found") // reuse this error in several places
 }
 
+// case-insensitive, same as the unique index on metrics.name
+// returns nil, nil when there is no metric with that name
+func GetMetricByName(db *sql.DB, name string) (*Metric, error) {
+	sqlQuery := `SELECT id, name FROM metrics WHERE name = $1 COLLATE NOCASE`
+	m := &Metric{}
+	err := db.QueryRow(sqlQuery, name).Scan(&m.ID, &m.Name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func GetMetrics(db *sql.DB) ([]*Metric, error) {
 	sqlQuery := `
 		SELECT id, name FROM metrics

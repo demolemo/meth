@@ -15,9 +15,10 @@ var valueCmd = &cobra.Command{
 }
 
 var (
-	valueAddID    int
-	valueAddValue float64
-	valueAddAt    string
+	valueAddID     int
+	valueAddMetric string
+	valueAddValue  float64
+	valueAddAt     string
 )
 
 var valueAddCmd = &cobra.Command{
@@ -33,7 +34,11 @@ var valueAddCmd = &cobra.Command{
 				return err
 			}
 		}
-		mv := &store.MetricValue{MetricID: valueAddID, Value: valueAddValue, CreatedAt: createdAt}
+		metricID, err := resolveMetricID(valueAddID, valueAddMetric)
+		if err != nil {
+			return err
+		}
+		mv := &store.MetricValue{MetricID: metricID, Value: valueAddValue, CreatedAt: createdAt}
 		if _, err := store.CreateMetricValue(db, mv); err != nil {
 			return err
 		}
@@ -47,6 +52,7 @@ var valueAddCmd = &cobra.Command{
 
 var (
 	valueUpdateMetricID int
+	valueUpdateMetric   string
 	valueUpdateValueID  int
 	valueUpdateValue    float64
 	valueUpdateAt       string
@@ -57,8 +63,12 @@ var valueUpdateCmd = &cobra.Command{
 	Short: "Update a value inside of a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		metricID, err := resolveMetricID(valueUpdateMetricID, valueUpdateMetric)
+		if err != nil {
+			return err
+		}
 		updatedAt := time.Now()
-		mv := &store.MetricValue{ID: valueUpdateValueID, MetricID: valueUpdateMetricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
+		mv := &store.MetricValue{ID: valueUpdateValueID, MetricID: metricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
 		if _, err := store.UpdateMetricValue(db, mv); err != nil {
 			return err
 		}
@@ -69,6 +79,7 @@ var valueUpdateCmd = &cobra.Command{
 
 var (
 	valueListMetricID int
+	valueListMetric   string
 	valueListLimit    int
 )
 
@@ -77,15 +88,19 @@ var valueListCmd = &cobra.Command{
 	Short: "List values of a metric, newest first",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mvs, err := store.GetMetricValues(db, valueListMetricID, valueListLimit)
+		metricID, err := resolveMetricID(valueListMetricID, valueListMetric)
+		if err != nil {
+			return err
+		}
+		mvs, err := store.GetMetricValues(db, metricID, valueListLimit)
 		if err != nil {
 			return err
 		}
 		if len(mvs) == 0 {
-			fmt.Printf("No values for metric %d\n", valueListMetricID)
+			fmt.Printf("No values for metric %d\n", metricID)
 			return nil
 		}
-		fmt.Printf("Values of metric %d:\n", valueListMetricID)
+		fmt.Printf("Values of metric %d:\n", metricID)
 		for _, mv := range mvs {
 			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(store.TimeLayout))
 		}
@@ -109,23 +124,42 @@ var valueDeleteCmd = &cobra.Command{
 	},
 }
 
+// --metric is an alternative to the metric id flag, cobra makes sure only one is set
+func resolveMetricID(id int, name string) (int, error) {
+	if name == "" {
+		return id, nil
+	}
+	m, err := store.GetMetricByName(db, name)
+	if err != nil {
+		return 0, err
+	}
+	if m == nil {
+		return 0, fmt.Errorf("metric %q not found", name)
+	}
+	return m.ID, nil
+}
+
 func init() {
 	rootCmd.AddCommand(valueCmd)
 
 	valueCmd.AddCommand(valueAddCmd)
 	valueAddCmd.Flags().IntVar(&valueAddID, "id", 0, "metric ID")
+	valueAddCmd.Flags().StringVarP(&valueAddMetric, "metric", "m", "", "metric name, alternative to --id")
 	valueAddCmd.Flags().Float64VarP(&valueAddValue, "value", "v", 0, "value to record")
 	valueAddCmd.Flags().StringVar(&valueAddAt, "at", "", `created_at, "2006-01-02 15:04" (default now)`)
-	valueAddCmd.MarkFlagRequired("id")
+	valueAddCmd.MarkFlagsOneRequired("id", "metric")
+	valueAddCmd.MarkFlagsMutuallyExclusive("id", "metric")
 	valueAddCmd.MarkFlagRequired("value")
 
 	// NOTE: very very ugly interface, I know that yo.
 	// i will make things better in the next pass
 	valueCmd.AddCommand(valueUpdateCmd)
 	valueUpdateCmd.Flags().IntVar(&valueUpdateMetricID, "mid", 0, "metric ID")
+	valueUpdateCmd.Flags().StringVarP(&valueUpdateMetric, "metric", "m", "", "metric name, alternative to --mid")
 	valueUpdateCmd.Flags().IntVar(&valueUpdateValueID, "vid", 0, "value ID")
 	valueUpdateCmd.Flags().Float64VarP(&valueUpdateValue, "value", "v", 0, "value to record")
-	valueUpdateCmd.MarkFlagRequired("mid")
+	valueUpdateCmd.MarkFlagsOneRequired("mid", "metric")
+	valueUpdateCmd.MarkFlagsMutuallyExclusive("mid", "metric")
 	valueUpdateCmd.MarkFlagRequired("vid")
 	valueUpdateCmd.MarkFlagRequired("value")
 
@@ -134,8 +168,10 @@ func init() {
 	// meth metric list - lists all the values (however, we have to pass the metric-id the either way)
 	valueCmd.AddCommand(valueListCmd)
 	valueListCmd.Flags().IntVar(&valueListMetricID, "id", 0, "metric ID")
+	valueListCmd.Flags().StringVarP(&valueListMetric, "metric", "m", "", "metric name, alternative to --id")
 	valueListCmd.Flags().IntVar(&valueListLimit, "limit", 5, "max values to show, -1 for all")
-	valueListCmd.MarkFlagRequired("id")
+	valueListCmd.MarkFlagsOneRequired("id", "metric")
+	valueListCmd.MarkFlagsMutuallyExclusive("id", "metric")
 
 	valueCmd.AddCommand(valueDeleteCmd)
 	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "vid", 0, "value ID")
