@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"meth/store"
 
@@ -23,6 +24,9 @@ var metricCreateCmd = &cobra.Command{
 	Short: "Create a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(metricCreateName) == "" {
+			return fmt.Errorf("metric name can't be empty")
+		}
 		rowsAffected, err := store.CreateMetric(db, &store.Metric{ID: metricCreateID, Name: metricCreateName})
 		if err != nil {
 			return err
@@ -61,6 +65,9 @@ var metricUpdateCmd = &cobra.Command{
 	Short: "Rename a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(metricUpdateName) == "" {
+			return fmt.Errorf("metric name can't be empty")
+		}
 		rowsAffected, err := store.UpdateMetricByID(db, &store.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
 		if err != nil {
 			return err
