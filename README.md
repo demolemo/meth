@@ -1,95 +1,35 @@
-# Product idea for the application
-There are many metrics that I'm tracking currently - weight, my PRs in the gym, my sleep score etc.
-It would be cool to store them in one place and share them with friends. Also friends inputting the metrics would be fun too.
-Metric is just a number with a date that this number was generated - that's about it.
+# Next ideas
+- [x] `list` - the verb that shows all metrics that exist inside of the service
+- [x] `delete` - the verb that deletes metric by id and maybe the name (if we impose UNIQUE constraint on that bitch)
+- [x] how should a process of adding a value work? `add-value` - CLI verb. Interface `meth add-value -name=[metric-name] -value`
+- [ ] `add-values` from CSV. - this should be just `add` verb with path to the file provided
+- [x] structure subcommands using flags
+- [ ] tests? fuzzy testing with AI or something.
+- [x] `value list` - the command to display the recent values (`limit, id` - flags that needed for this command)
+- [x] `value update` - what is the best interface for this? we want to update using the id?
+- [ ] `value delete` - using the `id` or using the `date` (this should be easy), what happens when values with given ids don't exist anymore
+- [ ] graphs? - it would be nice to display the metric along the period of time
+- [ ] web server to use the API - this is the most interesting part for me. because i don't completely understand how to serve the API over the endpoint. this looks messy for me.
+- [ ] general idea includes stuff like automatic execution but i'm not sure that this belongs in the scope of this project
 
 
-# Main types 
-`Metric` - aggregate over the metric values. values could be aggregated in different ways. Max value, min value, average (storage)
-`MetricValue` - singular metric value. Value of the metric in concrete point in time.
-`MetricService` - the `interface` that tells us how to interact with a metric, everything that implements it could work with a metric.
+# Open questions
+- what happens when we delete the metric with a certain id, do we move other metrics?
+- how do we attach values to metrics? by name prolly (name should be the main method of interaction, not `ID` field, too hard to keep track of)
+- if we delete the metric, what happens to the values? should we delete the values first?
 
-# Stages of the program that i see currently
-## MVP
-MVP - input one metric that is weight and aggregate weight inside of the day. Representation layer is just a table with avg value of the weight in one day.
-
-## Further work
-For now we are doing the MVP and not thinking too much inside what would be possible in the further versions of the program.
-
-# MVP types
-## MetricValue
+# Storing values and interacting with them
 ```go
 type MetricValue struct {
-    Value float // float value of the metric
-
-    ID int // id field to identify this value
-
-    // parent fields
-    MetricID int // parent metric id value so that metric storage has 1to1 correspondence
-    Metric *Metric // pointer to the parent metric, not sure why we store it here, i think for parent correspondence
-
-    // timefields that belong to this metric
-    CreatedAt timestamp // when was first this value created
-    UpdatedAt timestamp // when was last this value updated - should the value be updated? of course it should, for example we input an incorrect value by mistake.
-    }
+    ID int
+    MetricID int // or maybe store the pointer
+    Value float
+    CreatedAt time.Time // maybe store the date instead of datetime
+    UpdatedAt time.Time
+}
 ```
 
-## Metric
-```go
-type Metric struct {
-    ID int // field to identify this metric
+- **verb:** `add-value`
+- **usage:** `add-value -id=[ID] -value=[value] -name=[name] -created-at=[datetime|string]` - we can pass metric either by the `ID` or by the `name`
+- `add-values` with the following interface: `add-values -path=[filepath] -id=[ID] -name=[name]` and the csv should be one and only format that exists for now. CSV format: `value, created-at`
 
-    // timefields that are aggregate over the metric values, metric is not updated directly
-    CreatedAt timestamp // when was the first MetricValue that belongs to this metric created
-    UpdatedAt timestamp // when was the last MetricValue that belongs to this metric updated, inferred, never input directly
-
-    Name string // human readable name of the metric
-
-    AggValues *[]MetricValues // values of the metric aggregated in some manner
-    Values *[]MetricValues // all of the values that belong to this metric
-
-    // ?? not sure maybe i want to store the rule to agg near the metric and create some predefined rules of aggregation
-
-    AggRule AggRule // aggregation function to apply to the metric values
-    AggInterval AggInterval // aggregation interval to use when aggregating metric values
-    }
-
-// supporting types
-type AggRule int // aggregation rule to apply to the metric
-
-const (
-    AggMax AggRule = iota
-    AggMin
-    AggAvg
-)
-
-type AggInterval int // aggregation interval that applies to the metric
-
-const (
-    DayInterval AggInterval = iota
-    HourInterval
-    MinuteInterval
-)
-```
-
-## MetricService
-```go
-type MetricService interface {
-    FindMetricByID(id int) (*Metric, error) // search metric by id, returns error if metric is not found
-    FindMetricByName(name string) (*Metric, error) // search metric by name, returns error if metric is not found
-    CreateMetric(metric *Metric) error // validates the name of the metric 
-    UpdateMetric(id int, upd MetricUpdate) error // updates some params inside of the metric
-    DeleteMetricById(id int) error // tries to delete the metric, returns ERRNOTFOUND if there is no metric with the following id
-    DeleteMetricByName(name string) error // tries to delete the metric, returns ERRNOTFOUND if there is no metric with the following name
-    }
-```
-
-
-## MetricUpdate
-```go
-type MetricUpdate struct {
-        Name // New name for the metric
-        AggRule AggRule // New aggregation function to use for the metric
-        AggInterval AggInterval // New aggregation interval to use with the metric
-    }
-```

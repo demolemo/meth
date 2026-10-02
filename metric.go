@@ -1,129 +1,351 @@
-package meth
+package main
 
 import (
-	"errors"
+	"database/sql"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
-	"unicode/utf8"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-// two separate values
-// Metric - represents some kind of an aggregate over the metric values (storage)
-// MetricValue - singular metric value (more or less single)
-
-// what should metric contain
-// numeric value of the metric
-// when was that metric created
-// when was that metric updated
-// last values of the metric (previous values of the metric)
-// name of the metric
-
-type AggRule int
-
-const (
-	AggMax AggRule = iota
-	AggMin
-	AggAvg
-)
-
-type AggInterval int
-
-const (
-	MinuteInterval AggInterval = iota
-	HourInterval
-	DayInterval
-)
-
-// Main structure of the program, responsible for storing metric values
-type Metric struct {
-	// Unique field that helps to identify this metric
-	ID int `json:"id"`
-
-	// Human readable name that helps to identify the metric further
-	Name string `json:"name"`
-
-	// Values that are stored inside of this metric
-	Values *[]MetricValue `json:"values,omitempty"`
-
-	// Time fields, CreatedAt belongs to the Metric itself and UpdatedAt belongs to the underlying values
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-func (m *Metric) Validate() error {
-	if m.Name == "" {
-		return errors.New("Your name cannot be blank, nigga")
-	} else if utf8.RuneCountInString(m.Name) > 120 {
-		return errors.New("Your name cannot be that long, nigga")
+// how does the simplest version of the program works?
+// we can add values
+// and edit values
+// and view values
+// and that's about it
+// there are not 1000 of abstractions that fuck us over and make our life living hell?
+// the issue with the approach of writing everything correctly are actually two
+// 1. it's not fucking fun at all. i'm always thinking about how to make things right instead of how to make things work
+// 2. we have no working copy of the program till very late into writing process
+func insertValues(db *sql.DB, ID string, name string, salary int64) (int64, error) {
+	sqlQuery := `INSERT INTO emp VALUES($1, $2, $3)`
+	res, err := db.Exec(sqlQuery, ID, name, salary)
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rowsAffected, nil
 }
 
-// anything that implements this interface can access the metric
-type MetricService interface {
-	// search metric by it's unique numeric ID, return ERRNOTFOUND
-	// if there is no metric with according numeric id
-	FindMetricByID(id int) (*Metric, error)
-
-	// search metric by it's unique string Name, return ERRNOTFOUND
-	// if there is no metric with according string name
-	FindMetricByName(name string) (*Metric, error)
-
-	// pass a built metric so it could be recorded somewhere
-	// where does the metric id come from? from some outer service?
-	// do we validate that the name is unique on this stage?
-	CreateMetric(metric *Metric)
-
-	// generate a report with aggregated values
-	GenerateMetricReport(id int, aggRule AggRule, aggInterval AggInterval) (MetricValueReport, error)
-
-	// updates a given metric with new params
-	UpdateMetric(id int, upd MetricUpdate) (*Metric, error)
-
-	// deletes a given metric and all values attached to it?
-	// really good question to think about, are values deleted or retained?
-	DeleteMetricByID(id int) error
-
-	// deletes a given metric by name
-	// names are unique as we have decided
-	DeleteMetricByName(name string) error
-}
-
-type MetricUpdate struct {
+type Metric struct {
+	ID   int
 	Name string
 }
 
-// creating the aggregation values of the metric according to passed rules
-// this solves the issue with storing aggregated values - we don't store them at all!
-type MetricValueReport struct {
-	// ID - later we can think about some kind of id field that will help caching requests with the same params
-	// Name of the metric that produced that report
-	Name string `json:"name"`
-
-	// Rules which were applied to the underlying metric to arrive to this values
-	// Hmmm, maybe we don't even need to store aggrule and agginterval near the metric.
-	// metric is just raw values, that is implicit. i love that line of thinking
-
-	// Aggregation fields that define the aggregation rules inside of this metric
-	AggRule     AggRule     `json:"aggRule"`
-	AggInterval AggInterval `json:"aggInterval"`
-
-	// aggregated values according to aggregation rules above
-	// is storing time a good idea here? maybe we can store ints instead?
-	// we will try doing it that way first
-	Records []MetricValueRecord `json:"aggValues"`
+type MetricUpdate struct {
+	ID   int
+	Name string
 }
 
-// MetricValueRecord represents an average metric value at a given point in time
-// for the MetricValueReport.
-// this is done so that we are not storing maps in there
-type MetricValueRecord struct {
-	Value     float32   `json:"value"`
-	Timestamp time.Time `json:"timestamp"`
+func createMetric(db *sql.DB, m *Metric) (int64, error) {
+	sqlQuery := `INSERT INTO metrics VALUES($1, $2)`
+	res, err := db.Exec(sqlQuery, m.ID, m.Name)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rowsAffected, nil
 }
 
-// GoString prints a more easily readable representation for debugging.
-// The timestamp field is represented as an RFC 3339 string instead of a pointer.
-func (r *MetricValueRecord) GoString() string {
-	return fmt.Sprintf("&meth.MetricValueRecord{Value:%d, Timestamp:%q}", r.Value, r.Timestamp.Format(time.RFC3339))
+func getMetricByID(db *sql.DB, id int) (*Metric, error) {
+	sqlQuery := `
+		SELECT * FROM metrics WHERE id = $id
+	`
+	rows, err := db.Query(sqlQuery, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var name string
+
+	// what would this do if there is no rows?
+	for rows.Next() {
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		} else {
+			return &Metric{ID: id, Name: name}, nil
+		}
+	}
+	return nil, nil
+}
+
+func getMetrics(db *sql.DB) ([]*Metric, error) {
+	sqlQuery := `
+		SELECT id, name FROM metrics
+	`
+	rows, err := db.Query(sqlQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mets []*Metric
+	for rows.Next() {
+		m := &Metric{}
+		if err := rows.Scan(&m.ID, &m.Name); err != nil {
+			return mets, err
+		}
+		mets = append(mets, m)
+	}
+	return mets, nil
+}
+
+func updateMetricByID(db *sql.DB, mu *MetricUpdate) (int64, error) {
+	// do a check that metric exists first, for now we assume that it does
+	sqlQuery := `UPDATE metrics SET name = $1 WHERE id = $2`
+	res, err := db.Exec(sqlQuery, mu.Name, mu.ID)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, nil
+	}
+	return rowsAffected, nil
+}
+
+// solve the question with MetricValues. Do we need to delete values before the metric?
+// are we working with values separately or we deleting them beforehand
+func deleteMetricByID(db *sql.DB, id int) (int64, error) {
+	sqlQuery := `DELETE FROM metrics WHERE id = $id`
+	res, err := db.Exec(sqlQuery, id)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, nil
+	}
+	return rowsAffected, nil
+}
+
+type MetricValue struct {
+	ID        int
+	MetricID  int
+	Value     float64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func createMetricValue(db *sql.DB, mv *MetricValue) (int64, error) {
+	// we are worrying about corretly supplying the date outside of this function
+	// this solution gives us a little bit more responsibility
+	sqlQuery := `INSERT INTO metric_values(metric_id, value, created_at) VALUES($1, $2, $3)`
+	res, err := db.Exec(sqlQuery, mv.MetricID, mv.Value, mv.CreatedAt)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rowsAffected, nil
+}
+
+// parsing time from the following format
+// i have two metrics in mind currently, those are: weight and steps.
+// both those metrics doesn't require exact second when written down
+const timeLayout = "2006-01-02 15:04"
+
+func parseTime(s string) (time.Time, error) {
+	return time.ParseInLocation(timeLayout, s, time.Local)
+}
+
+func notReallyMain() {
+	db, err := sql.Open("sqlite3", "test.db?_foreign_keys=on")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	// think about making this naming shorter. add-value sounds clumsy
+	// add-values sounds even more clumsy. hard to proceed here with those names.
+	// the working name would be `add` and that's about it here.
+	//
+	// os.Args cannot have length 0 becuase it's always at least the program name
+	if len(os.Args) == 1 {
+		fmt.Print(`METH (METrics Health): stupid little program to track metrics:
+	-find: find ID
+	-create: create ID name
+	-add-value: add-value ID value [created_at]
+	-update: update ID new-name
+	-delete: delete ID
+	-list: list
+`)
+		return
+	}
+
+	if os.Args[1] == "find" {
+		if len(os.Args[2:]) != 1 {
+			fmt.Printf("usage: find ID\n")
+			return
+		} else {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+			met, err := getMetricByID(db, id)
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+			fmt.Printf("Metric, ID: %d, Name: %s\n", met.ID, met.Name)
+			return
+		}
+	} else if os.Args[1] == "create" {
+		if len(os.Args[2:]) != 2 {
+			fmt.Printf("usage: create ID name\n")
+			return
+		} else {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+			name := os.Args[3]
+			met := &Metric{ID: id, Name: name}
+
+			rowsAffected, err := createMetric(db, met)
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+
+			fmt.Printf("Metric created, rows affected: %d\n", rowsAffected)
+			return
+		}
+	} else if os.Args[1] == "add-value" {
+		if len(os.Args[2:]) != 2 && len(os.Args[2:]) != 3 {
+			fmt.Printf("usage: add-value ID value [created_at]")
+			return
+		}
+		var mv *MetricValue
+		if len(os.Args[2:]) == 2 {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error occured: %s\n", err.Error())
+				return
+			}
+
+			value, err := strconv.ParseFloat(os.Args[3], 64)
+			if err != nil {
+				fmt.Printf("Following error occured: %s\n", err.Error())
+				return
+			}
+
+			// here we can write a simple metric check first. if there is no metric with the following ID we freaking suck
+			mv = &MetricValue{MetricID: id, Value: value, CreatedAt: time.Now()}
+		}
+
+		if len(os.Args[2:]) == 3 {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error occured: %s\n", err.Error())
+				return
+			}
+
+			value, err := strconv.ParseFloat(os.Args[3], 64)
+			if err != nil {
+				fmt.Printf("Following error occured: %s\n", err.Error())
+				return
+			}
+
+			createdAt, err := parseTime(os.Args[4])
+			if err != nil {
+				fmt.Printf("Following error occured: %s\n", err.Error())
+				return
+			}
+
+			// here we can write a simple metric check first. if there is no metric with the following ID we freaking suck
+			mv = &MetricValue{MetricID: id, Value: value, CreatedAt: createdAt}
+		}
+
+		// for now it's empty
+		_, err := createMetricValue(db, mv)
+		if err != nil {
+			fmt.Printf("Following error occured: %s\n", err.Error())
+			return
+		}
+		fmt.Printf("Metric value added nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(timeLayout))
+		return
+	} else if os.Args[1] == "update" {
+		if len(os.Args[2:]) != 2 {
+			fmt.Printf("usage: update ID new-name\n")
+			return
+		} else {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+			name := os.Args[3]
+			mu := &MetricUpdate{ID: id, Name: name}
+
+			rowsAffected, err := updateMetricByID(db, mu)
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+
+			fmt.Printf("Metric created, rows affected: %d\n", rowsAffected)
+			return
+		}
+	} else if os.Args[1] == "list" {
+		if len(os.Args[2:]) != 0 {
+			fmt.Printf("usage: list\n")
+		} else {
+			mets, err := getMetrics(db)
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+
+			if len(mets) > 5 {
+				fmt.Printf("Following metrics exist (cut to first 5):\n")
+				for i := range 5 {
+					fmt.Printf("\tMetric, ID: %d, Name: %s\n", mets[i].ID, mets[i].Name)
+				}
+				return
+			} else {
+				fmt.Printf("Following metrics exist:\n")
+				for _, m := range mets {
+					fmt.Printf("\tMetric, ID: %d, Name: %s\n", m.ID, m.Name)
+				}
+				return
+			}
+		}
+	} else if os.Args[1] == "delete" {
+		if len(os.Args[2:]) != 1 {
+			fmt.Printf("usage: delete ID\n")
+			return
+		} else {
+			id, err := strconv.Atoi(os.Args[2])
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+			rowsAffected, err := deleteMetricByID(db, id)
+			if err != nil {
+				fmt.Printf("Following error has occured: %s\n", err.Error())
+				return
+			}
+
+			fmt.Printf("Metric deleted, rows affected: %d\n", rowsAffected)
+			return
+		}
+	} else {
+		fmt.Printf("Unknown command, use find or create")
+		return
+	}
 }
