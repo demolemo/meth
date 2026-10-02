@@ -9,12 +9,17 @@ import (
 )
 
 type MetricService struct {
-	metrics map[int]*meth.Metric
+	curID       int                  // current counter. removed metrics are not filled
+	metrics     map[int]*meth.Metric // from numeric ID to the metric
+	metricNames map[string]int       // from name to numeric ID
 }
 
 func NewMetricService() *MetricService {
 	metrics := make(map[int]*meth.Metric)
-	return &MetricService{metrics: metrics}
+	metricNames := make(map[string]int)
+	return &MetricService{
+		curID: 0, metrics: metrics, metricNames: metricNames,
+	}
 }
 
 func (ms *MetricService) FindMetricByID(id int) (*meth.Metric, error) {
@@ -25,15 +30,28 @@ func (ms *MetricService) FindMetricByID(id int) (*meth.Metric, error) {
 	return met, nil
 }
 
-func (ms *MetricService) CreateMetric(met *meth.Metric) error {
-	// here we can add an adidtional rule to check for the name
-	_, ok := ms.metrics[met.ID]
-	if ok {
-		return errors.New("Metric with a given ID already exists")
+func (ms *MetricService) FindMetricByName(name string) (*meth.Metric, error) {
+	metID, ok := ms.metricNames[name]
+	if !ok {
+		return nil, errors.New("Metric with a given name have not been found")
 	}
+	met, _ := ms.metrics[metID]
+	return met, nil
+}
 
-	// we just put metric in the storage and not worry about it too much
-	ms.metrics[met.ID] = met
+func (ms *MetricService) CreateMetric(met *meth.Metric) error {
+	// add the ID for the metric
+	id := ms.curID
+	currentTime := time.Now()
+
+	// setting all internal fields for the metric
+	met.ID = id
+	met.CreatedAt = currentTime
+	met.UpdatedAt = currentTime
+
+	// update metric storage
+	ms.metrics[id] = met
+	ms.curID += 1
 	return nil
 }
 
@@ -145,11 +163,24 @@ func (ms *MetricService) UpdateMetric(id int, upd meth.MetricUpdate) (*meth.Metr
 	return met, nil
 }
 
-func (ms *MetricService) DeleteMetric(id int) error {
-	_, err := ms.FindMetricByID(id)
+func (ms *MetricService) DeleteMetricByID(id int) error {
+	met, err := ms.FindMetricByID(id)
 	if err != nil {
 		return err
 	}
+	// delete metric from both storages
+	delete(ms.metricNames, met.Name)
 	delete(ms.metrics, id)
+	return nil
+}
+
+func (ms *MetricService) DeleteMetricByName(name string) error {
+	met, err := ms.FindMetricByName(name)
+	if err != nil {
+		return err
+	}
+	// delete metric from both storages
+	delete(ms.metricNames, met.Name)
+	delete(ms.metrics, met.ID)
 	return nil
 }

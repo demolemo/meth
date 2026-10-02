@@ -44,9 +44,6 @@ type Metric struct {
 
 	// Values that are stored inside of this metric
 	Values *[]MetricValue `json:"values,omitempty"`
-	// here i see the issue because this ensures that we need to create a new metric value for each aggregate
-	// i don't know how to solve this issue yet
-	AggValues *[]MetricValue `json:"aggValues,omitempty"`
 
 	// Time fields, CreatedAt belongs to the Metric itself and UpdatedAt belongs to the underlying values
 	CreatedAt time.Time `json:"createdAt"`
@@ -68,11 +65,9 @@ type MetricService interface {
 	// if there is no metric with according numeric id
 	FindMetricByID(id int) (*Metric, error)
 
-	// search metric by it's unique name, return ERRNOTFOUND
-	// if there is no metric with according name yo
-	// NOTE: i'm not sure that we need this thing because this creates a hassle with maintaining
-	// a set of metric names, for now it's commented out
-	// FindMetricByName(name string) (*Metric, error)
+	// search metric by it's unique string Name, return ERRNOTFOUND
+	// if there is no metric with according string name
+	FindMetricByName(name string) (*Metric, error)
 
 	// pass a built metric so it could be recorded somewhere
 	// where does the metric id come from? from some outer service?
@@ -87,7 +82,11 @@ type MetricService interface {
 
 	// deletes a given metric and all values attached to it?
 	// really good question to think about, are values deleted or retained?
-	DeleteMetric(id int) error
+	DeleteMetricByID(id int) error
+
+	// deletes a given metric by name
+	// names are unique as we have decided
+	DeleteMetricByName(name string) error
 }
 
 type MetricUpdate struct {
