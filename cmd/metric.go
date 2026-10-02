@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"meth/store"
+	"github.com/demolemo/meth/store"
 
 	"github.com/spf13/cobra"
 )
