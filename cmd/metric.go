@@ -36,14 +36,22 @@ var metricCreateCmd = &cobra.Command{
 	},
 }
 
-var metricFindID int
+var (
+	metricFindID   int
+	metricFindName string
+)
 
 var metricFindCmd = &cobra.Command{
 	Use:   "find",
 	Short: "Find a metric by ID",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		met, err := ms.GetMetricByID(metricFindID)
+		metricID, err := ms.ResolveMetricID(metricFindID, metricFindName)
+		if err != nil {
+			return err
+		}
+
+		met, err := ms.GetMetricByID(metricID)
 		if err != nil {
 			return err
 		}
@@ -77,14 +85,22 @@ var metricUpdateCmd = &cobra.Command{
 	},
 }
 
-var metricDeleteID int
+var (
+	metricDeleteID   int
+	metricDeleteName string
+)
 
 var metricDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		rowsAffected, err := ms.DeleteMetricByID(metricDeleteID)
+		metricID, err := ms.ResolveMetricID(metricDeleteID, metricDeleteName)
+		if err != nil {
+			return err
+		}
+
+		rowsAffected, err := ms.DeleteMetricByID(metricID)
 		if err != nil {
 			return err
 		}
@@ -127,7 +143,9 @@ func init() {
 
 	metricCmd.AddCommand(metricFindCmd)
 	metricFindCmd.Flags().IntVar(&metricFindID, "id", 0, "metric ID")
-	metricFindCmd.MarkFlagRequired("id")
+	metricFindCmd.Flags().StringVarP(&metricFindName, "metric", "m", "", "metric name, alternative to id flag")
+	metricFindCmd.MarkFlagsOneRequired("id", "metric")
+	metricFindCmd.MarkFlagsMutuallyExclusive("id", "metric")
 
 	metricCmd.AddCommand(metricUpdateCmd)
 	metricUpdateCmd.Flags().IntVar(&metricUpdateID, "id", 0, "metric ID")
@@ -137,7 +155,9 @@ func init() {
 
 	metricCmd.AddCommand(metricDeleteCmd)
 	metricDeleteCmd.Flags().IntVar(&metricDeleteID, "id", 0, "metric ID")
-	metricDeleteCmd.MarkFlagRequired("id")
+	metricDeleteCmd.Flags().StringVarP(&metricDeleteName, "metric", "m", "", "metric name, alternative to id flag")
+	metricDeleteCmd.MarkFlagsOneRequired("id", "metric")
+	metricDeleteCmd.MarkFlagsMutuallyExclusive("id", "metric")
 
 	metricCmd.AddCommand(metricListCmd)
 }

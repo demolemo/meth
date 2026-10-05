@@ -14,6 +14,7 @@ import (
 
 // opened before any command runs, see PersistentPreRunE
 var ms *sqlite.MetricService
+var vs *sqlite.ValueService
 var db *sql.DB
 
 // rootCmd represents the base command when called without any subcommands
@@ -29,6 +30,7 @@ var rootCmd = &cobra.Command{
 		}
 		// metric service is wired for all commands
 		ms = sqlite.NewMetricService(db)
+		vs = sqlite.NewValueService(db)
 		return err
 	},
 }

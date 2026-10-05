@@ -35,13 +35,12 @@ var valueAddCmd = &cobra.Command{
 				return err
 			}
 		}
-		metricID, err := resolveMetricID(valueAddID, valueAddMetric)
+		metricID, err := ms.ResolveMetricID(valueAddID, valueAddMetric)
 		if err != nil {
 			return err
 		}
 		mv := &meth.MetricValue{MetricID: metricID, Value: valueAddValue, CreatedAt: createdAt}
-		// NOTE: change this in the next pass, this would not work later
-		if _, err := sqlite.CreateMetricValue(db, mv); err != nil {
+		if _, err := vs.CreateMetricValue(mv); err != nil {
 			return err
 		}
 		fmt.Printf("Metric value added nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(sqlite.TimeLayout))
@@ -57,7 +56,6 @@ var (
 	valueUpdateMetric   string
 	valueUpdateValueID  int
 	valueUpdateValue    float64
-	valueUpdateAt       string
 )
 
 var valueUpdateCmd = &cobra.Command{
@@ -65,13 +63,13 @@ var valueUpdateCmd = &cobra.Command{
 	Short: "Update a value inside of a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		metricID, err := resolveMetricID(valueUpdateMetricID, valueUpdateMetric)
+		metricID, err := ms.ResolveMetricID(valueUpdateMetricID, valueUpdateMetric)
 		if err != nil {
 			return err
 		}
 		updatedAt := time.Now()
 		mv := &meth.MetricValue{ID: valueUpdateValueID, MetricID: metricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
-		if _, err := sqlite.UpdateMetricValue(ms, mv); err != nil {
+		if _, err := vs.UpdateMetricValue(mv); err != nil {
 			return err
 		}
 		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, updatedAt: %s\n", mv.MetricID, mv.Value, mv.UpdatedAt.Format(sqlite.TimeLayout))
@@ -80,9 +78,9 @@ var valueUpdateCmd = &cobra.Command{
 }
 
 var (
-	valueListMetricID int
-	valueListMetric   string
-	valueListLimit    int
+	valueListMetricID   int
+	valueListMetricName string
+	valueListLimit      int
 )
 
 var valueListCmd = &cobra.Command{
@@ -90,11 +88,11 @@ var valueListCmd = &cobra.Command{
 	Short: "List values of a metric, newest first",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		metricID, err := resolveMetricID(valueListMetricID, valueListMetric)
+		metricID, err := ms.ResolveMetricID(valueListMetricID, valueListMetricName)
 		if err != nil {
 			return err
 		}
-		mvs, err := sqlite.GetMetricValues(db, metricID, valueListLimit)
+		mvs, err := vs.GetMetricValues(metricID, valueListLimit)
 		if err != nil {
 			return err
 		}
@@ -117,28 +115,13 @@ var valueDeleteCmd = &cobra.Command{
 	Short: "Delete a value by its ID",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		rowsAffected, err := sqlite.DeleteMetricValueByID(db, valueDeleteValueID)
+		rowsAffected, err := vs.DeleteMetricValue(valueDeleteValueID)
 		if err != nil {
 			return err
 		}
 		fmt.Printf("Value deleted, rows affected: %d\n", rowsAffected)
 		return nil
 	},
-}
-
-// --metric is an alternative to the metric id flag, cobra makes sure only one is set
-func resolveMetricID(id int, name string) (int, error) {
-	if name == "" {
-		return id, nil
-	}
-	m, err := ms.GetMetricByName(name)
-	if err != nil {
-		return 0, err
-	}
-	if m == nil {
-		return 0, fmt.Errorf("metric %q not found", name)
-	}
-	return m.ID, nil
 }
 
 //	var valueImportCmd = &cobra.Command{
@@ -174,28 +157,21 @@ func init() {
 	// NOTE: very very ugly interface, I know that yo.
 	// i will make things better in the next pass
 	valueCmd.AddCommand(valueUpdateCmd)
-	valueUpdateCmd.Flags().IntVar(&valueUpdateMetricID, "mid", 0, "metric ID")
-	valueUpdateCmd.Flags().StringVarP(&valueUpdateMetric, "metric", "m", "", "metric name, alternative to --mid")
-	valueUpdateCmd.Flags().IntVar(&valueUpdateValueID, "vid", 0, "value ID")
+	valueUpdateCmd.Flags().IntVar(&valueUpdateValueID, "id", 0, "value ID")
 	valueUpdateCmd.Flags().Float64VarP(&valueUpdateValue, "value", "v", 0, "value to record")
-	valueUpdateCmd.MarkFlagsOneRequired("mid", "metric")
-	valueUpdateCmd.MarkFlagsMutuallyExclusive("mid", "metric")
-	valueUpdateCmd.MarkFlagRequired("vid")
+	valueUpdateCmd.MarkFlagRequired("id")
 	valueUpdateCmd.MarkFlagRequired("value")
 
-	// NOTE: this interface could be changed to:
-	// meth list - lists all of the metrics inside of the application
-	// meth metric list - lists all the values (however, we have to pass the metric-id the either way)
 	valueCmd.AddCommand(valueListCmd)
 	valueListCmd.Flags().IntVar(&valueListMetricID, "id", 0, "metric ID")
-	valueListCmd.Flags().StringVarP(&valueListMetric, "metric", "m", "", "metric name, alternative to --id")
+	valueListCmd.Flags().StringVarP(&valueListMetricName, "metric", "m", "", "metric name, alternative to --id")
 	valueListCmd.Flags().IntVar(&valueListLimit, "limit", 5, "max values to show, -1 for all")
 	valueListCmd.MarkFlagsOneRequired("id", "metric")
 	valueListCmd.MarkFlagsMutuallyExclusive("id", "metric")
 
 	valueCmd.AddCommand(valueDeleteCmd)
-	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "vid", 0, "value ID")
-	valueDeleteCmd.MarkFlagRequired("vid")
+	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "id", 0, "value ID")
+	valueDeleteCmd.MarkFlagRequired("id")
 
 	// valueCmd.AddCommand(valueImportCmd)
 	// valueImportCmd.Flags().StringVarP(%)

@@ -59,6 +59,7 @@ func (ms *MetricService) GetMetricByName(name string) (*meth.Metric, error) {
 	m := &meth.Metric{}
 	err := ms.db.QueryRow(sqlQuery, name).Scan(&m.ID, &m.Name)
 	if err == sql.ErrNoRows {
+		// TODO: return an error not found here
 		return nil, nil
 	}
 	if err != nil {
@@ -133,76 +134,16 @@ func (ms *MetricService) DeleteMetricByName(name string) (int64, error) {
 	return rowsAffected, nil
 }
 
-func CreateMetricValue(db *sql.DB, mv *meth.MetricValue) (int64, error) {
-	// we are worrying about corretly supplying the date outside of this function
-	// this solution gives us a little bit more responsibility
-	sqlQuery := `INSERT INTO metric_values(metric_id, value, created_at) VALUES($1, $2, $3)`
-	res, err := db.Exec(sqlQuery, mv.MetricID, mv.Value, mv.CreatedAt)
-	if err != nil {
-		return 0, err
+func (ms *MetricService) ResolveMetricID(id int, name string) (int, error) {
+	if id != 0 {
+		return id, nil
 	}
 
-	rowsAffected, err := res.RowsAffected()
+	m, err := ms.GetMetricByName(name)
 	if err != nil {
 		return 0, err
 	}
-	return rowsAffected, nil
-}
-
-func UpdateMetricValue(s *MetricService, mv *meth.MetricValue) (int64, error) {
-	_, err := s.GetMetricByID(mv.MetricID)
-	if err != nil {
-		return 0, err
-	}
-	// NOTE: we can avoid checking here because the query will do implicit checking
-	sqlQuery := `UPDATE metric_values SET value = $1, updated_at = $2 where id = $3 AND metric_id = $4`
-	res, err := s.db.Exec(sqlQuery, mv.Value, mv.UpdatedAt, mv.ID, mv.MetricID)
-	if err != nil {
-		return 0, err
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	return rowsAffected, nil
-}
-
-func DeleteMetricValueByID(db *sql.DB, id int) (int64, error) {
-	sqlQuery := `DELETE FROM metric_values WHERE id = $1`
-	res, err := db.Exec(sqlQuery, id)
-	if err != nil {
-		return 0, err
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	return rowsAffected, nil
-}
-
-// newest first. limit < 0 means no limit
-func GetMetricValues(db *sql.DB, metricID int, limit int) ([]*meth.MetricValue, error) {
-	sqlQuery := `
-		SELECT id, metric_id, value, created_at, updated_at FROM metric_values
-		WHERE metric_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2
-	`
-	rows, err := db.Query(sqlQuery, metricID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var mvs []*meth.MetricValue
-	for rows.Next() {
-		mv := &meth.MetricValue{}
-		if err := rows.Scan(&mv.ID, &mv.MetricID, &mv.Value, &mv.CreatedAt, &mv.UpdatedAt); err != nil {
-			return mvs, err
-		}
-		mvs = append(mvs, mv)
-	}
-	return mvs, rows.Err()
+	return m.ID, nil
 }
 
 // weight and steps don't need exact seconds
