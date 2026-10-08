@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"database/sql"
+	"fmt"
+	"time"
 
 	"github.com/demolemo/meth"
 )
@@ -17,8 +19,8 @@ func NewValueService(db *sql.DB) *ValueService {
 func (vs *ValueService) CreateMetricValue(mv *meth.MetricValue) (int64, error) {
 	// we are worrying about corretly supplying the date outside of this function
 	// this solution gives us a little bit more responsibility
-	sqlQuery := `INSERT INTO metric_values(metric_id, value, created_at) VALUES($1, $2, $3)`
-	res, err := vs.db.Exec(sqlQuery, mv.MetricID, mv.Value, mv.CreatedAt)
+	sqlQuery := `INSERT INTO metric_values(metric_id, value, created_at, updated_at) VALUES($1, $2, $3, $4)`
+	res, err := vs.db.Exec(sqlQuery, mv.MetricID, mv.Value, mv.CreatedAt, time.Now())
 	if err != nil {
 		return 0, err
 	}
@@ -102,4 +104,76 @@ func (vs *ValueService) DeleteMetricValue(valueID int) (int64, error) {
 		return 0, err
 	}
 	return rowsAffected, nil
+}
+
+// ImportResult counts what a batch did.
+type ImportResult struct {
+	Inserted  int
+	Updated   int
+	Unchanged int
+}
+
+// CreateMetricValues writes a batch in one transaction, treating
+// (metric_id, created_at) as a reading's identity: re-importing an overlapping
+// export changes nothing unless the number did. Two statements rather than an
+// upsert because no unique index backs that pair.
+func (vs *ValueService) CreateMetricValues(mvs []*meth.MetricValue) (ImportResult, error) {
+	var res ImportResult
+
+	tx, err := vs.db.Begin()
+	if err != nil {
+		return res, err
+	}
+	defer tx.Rollback()
+
+	update, err := tx.Prepare(`
+		UPDATE metric_values SET value = $1, updated_at = $2
+		WHERE metric_id = $3 AND created_at = $4 AND value <> $5
+	`)
+	if err != nil {
+		return res, err
+	}
+	defer update.Close()
+
+	insert, err := tx.Prepare(`
+		INSERT INTO metric_values(metric_id, value, created_at, updated_at)
+		SELECT $1, $2, $3, $4
+		WHERE NOT EXISTS (
+			SELECT 1 FROM metric_values WHERE metric_id = $5 AND created_at = $6
+		)
+	`)
+	if err != nil {
+		return res, err
+	}
+	defer insert.Close()
+
+	now := time.Now()
+	for i, mv := range mvs {
+		changed, err := rowsAffected(update.Exec(mv.Value, now, mv.MetricID, mv.CreatedAt, mv.Value))
+		if err != nil {
+			return res, fmt.Errorf("value %d of %d: %w", i+1, len(mvs), err)
+		}
+		if changed > 0 {
+			res.Updated++
+			continue
+		}
+
+		added, err := rowsAffected(insert.Exec(mv.MetricID, mv.Value, mv.CreatedAt, now, mv.MetricID, mv.CreatedAt))
+		if err != nil {
+			return res, fmt.Errorf("value %d of %d: %w", i+1, len(mvs), err)
+		}
+		if added > 0 {
+			res.Inserted++
+		} else {
+			res.Unchanged++
+		}
+	}
+	return res, tx.Commit()
+}
+
+func rowsAffected(res sql.Result, err error) (int64, error) {
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
