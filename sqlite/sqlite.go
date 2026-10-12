@@ -35,8 +35,13 @@ func Open(path string) (*sql.DB, error) {
 
 	// the file: URI form, not the bare "path?params" string: with a ? in the
 	// path that one splits in the wrong place, silently opening a different
-	// file with foreign keys off
-	dsn := url.URL{Scheme: "file", Path: path, RawQuery: "_foreign_keys=on"}
+	// file with foreign keys off. Absolute because a relative path renders as
+	// file://w.db, where sqlite reads w.db as the authority and rejects it
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	dsn := url.URL{Scheme: "file", Path: abs, RawQuery: "_foreign_keys=on"}
 	db, err := sql.Open("sqlite3", dsn.String())
 	if err != nil {
 		return nil, err
