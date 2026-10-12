@@ -55,9 +55,6 @@ var metricFindCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if met == nil {
-			return fmt.Errorf("metric %d not found", metricFindID)
-		}
 		fmt.Printf("Metric, ID: %d, Name: %s\n", met.ID, met.Name)
 		return nil
 	},

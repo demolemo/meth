@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,23 +37,22 @@ func (vs *ValueService) CreateMetricValue(mv *meth.MetricValue) (int64, error) {
 	return rowsAffected, nil
 }
 
+// wraps meth.ErrNotFound when no value has that id. It used to hand back a
+// zero-valued MetricValue and a nil error, which reads as "value 0 of metric
+// 0 is 0" at every call site.
 func (vs *ValueService) GetMetricValue(valueID int) (*meth.MetricValue, error) {
 	sqlQuery := `
 		SELECT id, metric_id, value, created_at, updated_at
 		FROM metric_values
-		WHERE id = $id
+		WHERE id = $1
 	`
-	rows, err := vs.db.Query(sqlQuery, valueID)
+	mv := &meth.MetricValue{}
+	err := vs.db.QueryRow(sqlQuery, valueID).Scan(&mv.ID, &mv.MetricID, &mv.Value, &mv.CreatedAt, &mv.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("value %d: %w", valueID, meth.ErrNotFound)
+	}
 	if err != nil {
 		return nil, err
-	}
-	defer rows.Close()
-
-	mv := &meth.MetricValue{}
-	for rows.Next() {
-		if err := rows.Scan(&mv.ID, &mv.MetricID, &mv.Value, &mv.CreatedAt, &mv.UpdatedAt); err != nil {
-			return nil, err
-		}
 	}
 	return mv, nil
 }
@@ -83,10 +83,16 @@ func (vs *ValueService) GetMetricValues(metricID int, limit int) ([]*meth.Metric
 	return mvs, rows.Err()
 }
 
+// keyed on the value id alone. mv.MetricID is not in the WHERE clause: id is
+// the primary key, so scoping by metric could never match a different row, and
+// requiring it meant a caller had to name the metric just to edit one reading.
+//
+// wraps meth.ErrNotFound when no value has that id
+//
 // QUESTION: should we send a value update instead of the value itself?
 func (vs *ValueService) UpdateMetricValue(mv *meth.MetricValue) (int64, error) {
-	sqlQuery := `UPDATE metric_values SET value = $1, updated_at = $2 where id = $3 AND metric_id = $4`
-	res, err := vs.db.Exec(sqlQuery, mv.Value, mv.UpdatedAt, mv.ID, mv.MetricID)
+	sqlQuery := `UPDATE metric_values SET value = $1, updated_at = $2 WHERE id = $3`
+	res, err := vs.db.Exec(sqlQuery, mv.Value, mv.UpdatedAt, mv.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -94,9 +100,14 @@ func (vs *ValueService) UpdateMetricValue(mv *meth.MetricValue) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if rowsAffected == 0 {
+		return 0, fmt.Errorf("value %d: %w", mv.ID, meth.ErrNotFound)
+	}
 	return rowsAffected, nil
 }
 
+// wraps meth.ErrNotFound when no value has that id, rather than reporting a
+// successful delete of nothing
 func (vs *ValueService) DeleteMetricValue(valueID int) (int64, error) {
 	sqlQuery := `DELETE FROM metric_values WHERE id = $1`
 	res, err := vs.db.Exec(sqlQuery, valueID)
@@ -106,6 +117,9 @@ func (vs *ValueService) DeleteMetricValue(valueID int) (int64, error) {
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
 		return 0, err
+	}
+	if rowsAffected == 0 {
+		return 0, fmt.Errorf("value %d: %w", valueID, meth.ErrNotFound)
 	}
 	return rowsAffected, nil
 }

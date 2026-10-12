@@ -54,27 +54,24 @@ var valueAddCmd = &cobra.Command{
 // much like in wtfgo
 
 var (
-	valueUpdateMetricID int
-	valueUpdateMetric   string
-	valueUpdateValueID  int
-	valueUpdateValue    float64
+	valueUpdateValueID int
+	valueUpdateValue   float64
 )
 
+// the value id is enough to find the row, so this takes no metric. it used to
+// resolve one out of two variables that were never bound to any flag, so every
+// run failed with `metric "": not found`.
 var valueUpdateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update a value inside of a metric",
+	Short: "Update a value by its ID",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		metricID, err := ms.ResolveMetricID(valueUpdateMetricID, valueUpdateMetric)
-		if err != nil {
-			return err
-		}
 		updatedAt := time.Now()
-		mv := &meth.MetricValue{ID: valueUpdateValueID, MetricID: metricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
+		mv := &meth.MetricValue{ID: valueUpdateValueID, Value: valueUpdateValue, UpdatedAt: updatedAt}
 		if _, err := vs.UpdateMetricValue(mv); err != nil {
 			return err
 		}
-		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, updatedAt: %s\n", mv.MetricID, mv.Value, mv.UpdatedAt.Format(parse.TimeLayout))
+		fmt.Printf("Metric value update nigga - valueID: %d, value: %.2f, updatedAt: %s\n", mv.ID, mv.Value, mv.UpdatedAt.Format(parse.TimeLayout))
 		return nil
 	},
 }
@@ -180,8 +177,6 @@ func init() {
 	valueAddCmd.MarkFlagsMutuallyExclusive("id", "metric")
 	valueAddCmd.MarkFlagRequired("value")
 
-	// NOTE: very very ugly interface, I know that yo.
-	// i will make things better in the next pass
 	valueCmd.AddCommand(valueUpdateCmd)
 	valueUpdateCmd.Flags().IntVar(&valueUpdateValueID, "id", 0, "value ID")
 	valueUpdateCmd.Flags().Float64VarP(&valueUpdateValue, "value", "v", 0, "value to record")
