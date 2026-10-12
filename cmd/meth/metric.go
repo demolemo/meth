@@ -17,6 +17,7 @@ var metricCmd = &cobra.Command{
 var (
 	metricCreateID   int
 	metricCreateName string
+	metricCreateUnit string
 )
 
 var metricCreateCmd = &cobra.Command{
@@ -27,7 +28,7 @@ var metricCreateCmd = &cobra.Command{
 		if strings.TrimSpace(metricCreateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
-		rowsAffected, err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName})
+		rowsAffected, err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName, Unit: metricCreateUnit})
 		if err != nil {
 			return err
 		}
@@ -58,7 +59,7 @@ var metricFindCmd = &cobra.Command{
 		if met == nil {
 			return fmt.Errorf("metric %d not found", metricFindID)
 		}
-		fmt.Printf("Metric, ID: %d, Name: %s\n", met.ID, met.Name)
+		fmt.Printf("Metric, ID: %d, Name: %s, Unit: %s\n", met.ID, met.Name, met.Unit)
 		return nil
 	},
 }
@@ -66,6 +67,7 @@ var metricFindCmd = &cobra.Command{
 var (
 	metricUpdateID   int
 	metricUpdateName string
+	metricUpdateUnit string
 )
 
 var metricUpdateCmd = &cobra.Command{
@@ -73,10 +75,23 @@ var metricUpdateCmd = &cobra.Command{
 	Short: "Rename a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if strings.TrimSpace(metricUpdateName) == "" {
-			return fmt.Errorf("metric name can't be empty")
+		// UpdateMetricByID writes both columns, so the one that was not
+		// passed has to come from the row rather than from the zero value
+		met, err := ms.GetMetricByID(metricUpdateID)
+		if err != nil {
+			return err
 		}
-		rowsAffected, err := ms.UpdateMetricByID(&meth.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
+		mu := &meth.MetricUpdate{ID: met.ID, Name: met.Name, Unit: met.Unit}
+		if cmd.Flags().Changed("name") {
+			if strings.TrimSpace(metricUpdateName) == "" {
+				return fmt.Errorf("metric name can't be empty")
+			}
+			mu.Name = metricUpdateName
+		}
+		if cmd.Flags().Changed("unit") {
+			mu.Unit = metricUpdateUnit
+		}
+		rowsAffected, err := ms.UpdateMetricByID(mu)
 		if err != nil {
 			return err
 		}
@@ -109,24 +124,44 @@ var metricDeleteCmd = &cobra.Command{
 	},
 }
 
+var (
+	metricListPrefix string
+	metricListLimit  int
+)
+
 var metricListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List metrics (first 5)",
-	Args:  cobra.NoArgs,
+	Short: "List metrics, optionally one dotted family",
+	Long: `List metrics, optionally one dotted family.
+
+A family is not a row anywhere, it is the start of a name:
+
+  meth metric list --prefix sleep.       # every sleep metric
+  meth metric list --prefix sleep.r      # sleep.rem and sleep.resp_rate`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// NOTE: change for a function with limit, repeat once again
-		mets, err := ms.GetMetrics()
+		mets, err := ms.GetMetricsByPrefix(metricListPrefix)
 		if err != nil {
 			return err
 		}
-		if len(mets) > 5 {
-			fmt.Printf("Following metrics exist (cut to first 5):\n")
-			mets = mets[:5]
-		} else {
-			fmt.Printf("Following metrics exist:\n")
+		if len(mets) == 0 {
+			if metricListPrefix == "" {
+				fmt.Printf("No metrics yet\n")
+			} else {
+				fmt.Printf("No metrics under %q\n", metricListPrefix)
+			}
+			return nil
 		}
-		for _, m := range mets {
-			fmt.Printf("\tMetric, ID: %d, Name: %s\n", m.ID, m.Name)
+
+		shown := mets
+		if metricListLimit > 0 && len(shown) > metricListLimit {
+			shown = shown[:metricListLimit]
+			fmt.Printf("%d metrics, first %d:\n", len(mets), len(shown))
+		} else {
+			fmt.Printf("%d metrics:\n", len(mets))
+		}
+		for _, m := range shown {
+			fmt.Printf("\t%4d  %-22s %s\n", m.ID, m.Name, m.Unit)
 		}
 		return nil
 	},
@@ -137,7 +172,8 @@ func init() {
 
 	metricCmd.AddCommand(metricCreateCmd)
 	metricCreateCmd.Flags().IntVar(&metricCreateID, "id", 0, "metric ID")
-	metricCreateCmd.Flags().StringVarP(&metricCreateName, "name", "n", "", "metric name")
+	metricCreateCmd.Flags().StringVarP(&metricCreateName, "name", "n", "", "metric name, a dotted path such as sleep.rem")
+	metricCreateCmd.Flags().StringVarP(&metricCreateUnit, "unit", "u", "", `what the numbers are in, e.g. "h", "%", "kg"`)
 	metricCreateCmd.MarkFlagRequired("id")
 	metricCreateCmd.MarkFlagRequired("name")
 
@@ -150,8 +186,9 @@ func init() {
 	metricCmd.AddCommand(metricUpdateCmd)
 	metricUpdateCmd.Flags().IntVar(&metricUpdateID, "id", 0, "metric ID")
 	metricUpdateCmd.Flags().StringVarP(&metricUpdateName, "name", "n", "", "new metric name")
+	metricUpdateCmd.Flags().StringVarP(&metricUpdateUnit, "unit", "u", "", `new unit, e.g. "h", "%", "kg"`)
 	metricUpdateCmd.MarkFlagRequired("id")
-	metricUpdateCmd.MarkFlagRequired("name")
+	metricUpdateCmd.MarkFlagsOneRequired("name", "unit")
 
 	metricCmd.AddCommand(metricDeleteCmd)
 	metricDeleteCmd.Flags().IntVar(&metricDeleteID, "id", 0, "metric ID")
@@ -160,4 +197,6 @@ func init() {
 	metricDeleteCmd.MarkFlagsMutuallyExclusive("id", "metric")
 
 	metricCmd.AddCommand(metricListCmd)
+	metricListCmd.Flags().StringVarP(&metricListPrefix, "prefix", "p", "", "only metrics whose name starts with this")
+	metricListCmd.Flags().IntVar(&metricListLimit, "limit", 0, "max metrics to show, 0 for all")
 }

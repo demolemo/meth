@@ -12,6 +12,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	dateLayout = "2006-01-02"
+
+	// a reading anchored at a sleep's end lands on a second, not a minute,
+	// so parse.TimeLayout would hide which of two sessions a row belongs to
+	stampLayout = "2006-01-02 15:04:05 -07:00"
+)
+
 var valueCmd = &cobra.Command{
 	Use:   "value",
 	Short: "Manage metric values",
@@ -54,10 +62,8 @@ var valueAddCmd = &cobra.Command{
 // much like in wtfgo
 
 var (
-	valueUpdateMetricID int
-	valueUpdateMetric   string
-	valueUpdateValueID  int
-	valueUpdateValue    float64
+	valueUpdateValueID int
+	valueUpdateValue   float64
 )
 
 var valueUpdateCmd = &cobra.Command{
@@ -65,12 +71,14 @@ var valueUpdateCmd = &cobra.Command{
 	Short: "Update a value inside of a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		metricID, err := ms.ResolveMetricID(valueUpdateMetricID, valueUpdateMetric)
+		// the metric comes from the value, not from a flag: UpdateMetricValue
+		// matches on both and --id names a value
+		old, err := vs.GetMetricValue(valueUpdateValueID)
 		if err != nil {
 			return err
 		}
 		updatedAt := time.Now()
-		mv := &meth.MetricValue{ID: valueUpdateValueID, MetricID: metricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
+		mv := &meth.MetricValue{ID: old.ID, MetricID: old.MetricID, Value: valueUpdateValue, UpdatedAt: updatedAt}
 		if _, err := vs.UpdateMetricValue(mv); err != nil {
 			return err
 		}
@@ -98,16 +106,97 @@ var valueListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		met, err := ms.GetMetricByID(metricID)
+		if err != nil {
+			return err
+		}
 		if len(mvs) == 0 {
-			fmt.Printf("No values for metric %d\n", metricID)
+			fmt.Printf("No values for %s\n", met.Name)
 			return nil
 		}
-		fmt.Printf("Values of metric %d:\n", metricID)
+		fmt.Printf("%s (%s), newest first:\n", met.Name, met.Unit)
 		for _, mv := range mvs {
-			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(parse.TimeLayout))
+			fmt.Printf("\t%4d  %10.3f  %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(stampLayout))
 		}
 		return nil
 	},
+}
+
+var (
+	valueDayDate   string
+	valueDayTZ     string
+	valueDayPrefix string
+)
+
+var valueDayCmd = &cobra.Command{
+	Use:   "day",
+	Short: "Everything recorded on one calendar day, across every metric",
+	Long: `Everything recorded on one calendar day, across every metric.
+
+The day is a window over created_at, resolved in --tz. That zone matters:
+a reading is one instant and the model has nowhere to keep the zone it was
+recorded in, so a night slept in +08:00 and read back in +03:00 can fall on
+the day before.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		loc, err := location(valueDayTZ)
+		if err != nil {
+			return err
+		}
+		from, err := time.ParseInLocation(dateLayout, valueDayDate, loc)
+		if err != nil {
+			return err
+		}
+
+		mvs, err := vs.GetValuesBetween(from, from.AddDate(0, 0, 1))
+		if err != nil {
+			return err
+		}
+		mets, err := ms.GetMetricsByPrefix(valueDayPrefix)
+		if err != nil {
+			return err
+		}
+		// one lookup table rather than a metric read per value: the join the
+		// single values table does not do for us
+		byID := make(map[int]*meth.Metric, len(mets))
+		for _, m := range mets {
+			byID[m.ID] = m
+		}
+
+		shown := 0
+		for _, mv := range mvs {
+			m, ok := byID[mv.MetricID]
+			if !ok {
+				continue
+			}
+			if shown == 0 {
+				fmt.Printf("%s in %s:\n", valueDayDate, loc)
+			}
+			shown++
+			fmt.Printf("\t%-22s %10.3f %-5s %s\n", m.Name, mv.Value, m.Unit, mv.CreatedAt.In(loc).Format(stampLayout))
+		}
+		if shown == 0 {
+			fmt.Printf("Nothing recorded on %s in %s\n", valueDayDate, loc)
+		}
+		return nil
+	},
+}
+
+// location reads an IANA name or a bare ±HH:MM offset, the form a whoop dump
+// carries. An empty name is the machine's zone.
+func location(name string) (*time.Location, error) {
+	if name == "" {
+		return time.Local, nil
+	}
+	if loc, err := time.LoadLocation(name); err == nil {
+		return loc, nil
+	}
+	t, err := time.Parse("-07:00", name)
+	if err != nil {
+		return nil, fmt.Errorf("timezone %q: not an IANA name and not a ±HH:MM offset", name)
+	}
+	_, offset := t.Zone()
+	return time.FixedZone(name, offset), nil
 }
 
 var valueDeleteValueID int
@@ -194,6 +283,12 @@ func init() {
 	valueListCmd.Flags().IntVar(&valueListLimit, "limit", 5, "max values to show, -1 for all")
 	valueListCmd.MarkFlagsOneRequired("id", "metric")
 	valueListCmd.MarkFlagsMutuallyExclusive("id", "metric")
+
+	valueCmd.AddCommand(valueDayCmd)
+	valueDayCmd.Flags().StringVarP(&valueDayDate, "date", "d", "", "the day to show, 2006-01-02")
+	valueDayCmd.Flags().StringVar(&valueDayTZ, "tz", "", "zone the day is resolved in: an IANA name or ±HH:MM (default local)")
+	valueDayCmd.Flags().StringVarP(&valueDayPrefix, "prefix", "p", "", "only metrics whose name starts with this")
+	valueDayCmd.MarkFlagRequired("date")
 
 	valueCmd.AddCommand(valueDeleteCmd)
 	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "id", 0, "value ID")
