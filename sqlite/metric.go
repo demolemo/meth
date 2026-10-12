@@ -18,17 +18,17 @@ func NewMetricService(db *sql.DB) *MetricService {
 	return &MetricService{db: db}
 }
 
+// returns the id of the new metric.
+//
+// NULLIF because a zero m.ID means "assign one": sqlite only picks the next
+// rowid for a NULL, a literal 0 it stores as the id.
 func (ms *MetricService) CreateMetric(m *meth.Metric) (int64, error) {
-	sqlQuery := `INSERT INTO metrics VALUES($1, $2)`
+	sqlQuery := `INSERT INTO metrics (id, name) VALUES(NULLIF($1, 0), $2)`
 	res, err := ms.db.Exec(sqlQuery, m.ID, m.Name)
 	if err != nil {
 		return 0, err
 	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	return rowsAffected, nil
+	return res.LastInsertId()
 }
 
 // wraps meth.ErrNotFound when no metric has that id

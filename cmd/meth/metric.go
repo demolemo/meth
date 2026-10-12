@@ -27,11 +27,11 @@ var metricCreateCmd = &cobra.Command{
 		if strings.TrimSpace(metricCreateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
-		rowsAffected, err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName})
+		id, err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName})
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Metric created, rows affected: %d\n", rowsAffected)
+		fmt.Printf("Metric created, ID: %d\n", id)
 		return nil
 	},
 }
@@ -133,9 +133,8 @@ func init() {
 	rootCmd.AddCommand(metricCmd)
 
 	metricCmd.AddCommand(metricCreateCmd)
-	metricCreateCmd.Flags().IntVar(&metricCreateID, "id", 0, "metric ID")
+	metricCreateCmd.Flags().IntVar(&metricCreateID, "id", 0, "metric ID, assigned by the database when omitted")
 	metricCreateCmd.Flags().StringVarP(&metricCreateName, "name", "n", "", "metric name")
-	metricCreateCmd.MarkFlagRequired("id")
 	metricCreateCmd.MarkFlagRequired("name")
 
 	metricCmd.AddCommand(metricFindCmd)

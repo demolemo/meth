@@ -25,6 +25,8 @@ type MetricUpdate struct {
 //
 // NOTE: we should remove int64 as param for all those methods, only viable inside of the sqlite
 type MetricService interface {
+	// returns the id of the new metric: the one in m.ID, or the one the store
+	// assigned when m.ID is zero
 	CreateMetric(m *Metric) (int64, error)
 
 	// wraps ErrNotFound when no metric has that id
