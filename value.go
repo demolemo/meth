@@ -34,6 +34,10 @@ type ValueService interface {
 	GetMetricValue(valueID int) (*MetricValue, error)
 	// THIS IS R BUT IT'S a G again
 	GetMetricValues(metricID int, limit int) ([]*MetricValue, error)
+	// every metric's values in [from, to), newest first. answers "what was
+	// recorded that night" across the whole namespace at once
+	GetValuesBetween(from, to time.Time) ([]*MetricValue, error)
+
 	// this is U no surprise this time
 	UpdateMetricValue(mv *MetricValue) (int64, error)
 	// this is D. don't get any funny ideas here
