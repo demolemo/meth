@@ -79,6 +79,11 @@ meth value import -m weight -f health-export.json     # Health Export Kit, bodyM
 
 Every verb takes `--id` or `-m/--metric` to name the metric, never both.
 
+A metric or value that is not there is an error with exit 1, never a
+`rows affected: 0` that exits 0. Every lookup and every write reports a miss by
+wrapping `meth.ErrNotFound`, so a scheduled importer can tell "nothing to do"
+from "it worked".
+
 `value import` is idempotent: a reading is identified by
 `(metric_id, created_at)`, so re-importing an overlapping export changes
 nothing unless the number itself changed. It reports `new / updated / already

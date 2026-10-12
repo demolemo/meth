@@ -8,6 +8,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+
+	// this package is the one that hardcodes the "sqlite3" driver name, so it
+	// registers the driver too. Leaving that to the caller means every new
+	// consumer gets `sql: unknown driver "sqlite3"` at runtime until someone
+	// remembers the blank import.
+	_ "github.com/mattn/go-sqlite3"
 )
 
 //go:embed schema.sql

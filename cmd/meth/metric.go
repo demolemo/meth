@@ -24,6 +24,7 @@ var metricCreateCmd = &cobra.Command{
 	Short: "Create a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		quietUsage(cmd)
 		if strings.TrimSpace(metricCreateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
@@ -46,6 +47,7 @@ var metricFindCmd = &cobra.Command{
 	Short: "Find a metric by ID",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		quietUsage(cmd)
 		metricID, err := ms.ResolveMetricID(metricFindID, metricFindName)
 		if err != nil {
 			return err
@@ -54,9 +56,6 @@ var metricFindCmd = &cobra.Command{
 		met, err := ms.GetMetricByID(metricID)
 		if err != nil {
 			return err
-		}
-		if met == nil {
-			return fmt.Errorf("metric %d not found", metricFindID)
 		}
 		fmt.Printf("Metric, ID: %d, Name: %s\n", met.ID, met.Name)
 		return nil
@@ -73,6 +72,7 @@ var metricUpdateCmd = &cobra.Command{
 	Short: "Rename a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		quietUsage(cmd)
 		if strings.TrimSpace(metricUpdateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
@@ -95,6 +95,7 @@ var metricDeleteCmd = &cobra.Command{
 	Short: "Delete a metric",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		quietUsage(cmd)
 		metricID, err := ms.ResolveMetricID(metricDeleteID, metricDeleteName)
 		if err != nil {
 			return err
@@ -114,6 +115,7 @@ var metricListCmd = &cobra.Command{
 	Short: "List metrics (first 5)",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		quietUsage(cmd)
 		// NOTE: change for a function with limit, repeat once again
 		mets, err := ms.GetMetrics()
 		if err != nil {

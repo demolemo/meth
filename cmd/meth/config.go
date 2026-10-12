@@ -18,6 +18,7 @@ var configCmd = &cobra.Command{
 	// must not be what creates it
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error { return nil },
 	RunE: func(cmd *cobra.Command, args []string) error {
+		quietUsage(cmd)
 		cfgPath, err := config.Path()
 		if err != nil {
 			return err
@@ -69,6 +70,7 @@ var configInitCmd = &cobra.Command{
 	Short: "Write a config file with the current settings",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		quietUsage(cmd)
 		cfg, err := config.Load()
 		if err != nil {
 			return err

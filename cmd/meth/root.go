@@ -47,6 +47,17 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// quietUsage stops cobra from printing the whole flag reference after a failure
+// that has nothing to do with flags, like a metric that is not there.
+//
+// It has to be called inside RunE. Cobra validates required flags and flag
+// groups *after* the PreRun hooks, so setting SilenceUsage any earlier, or on
+// the root command, also swallows the usage block for genuine flag mistakes,
+// which is the one case where printing it helps.
+func quietUsage(cmd *cobra.Command) {
+	cmd.SilenceUsage = true
+}
+
 // dbPath resolves the database location: --db first, then the config file,
 // then the built-in default.
 func dbPath() (string, error) {
