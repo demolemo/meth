@@ -3,7 +3,7 @@ package sqlite
 import (
 	"database/sql"
 	"errors"
-	"time"
+	"fmt"
 
 	"github.com/demolemo/meth"
 )
@@ -143,14 +143,8 @@ func (ms *MetricService) ResolveMetricID(id int, name string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	if m == nil {
+		return 0, fmt.Errorf("metric %q not found", name)
+	}
 	return m.ID, nil
-}
-
-// weight and steps don't need exact seconds
-// NOTE: this bullshit needs to be exported better or not exported at all.
-// additional dep, bad stuff
-const TimeLayout = "2006-01-02 15:04"
-
-func ParseTime(s string) (time.Time, error) {
-	return time.ParseInLocation(TimeLayout, s, time.Local)
 }

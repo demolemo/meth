@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/demolemo/meth"
-	"github.com/demolemo/meth/sqlite"
+	"github.com/demolemo/meth/parse"
 
 	"github.com/spf13/cobra"
 )
@@ -30,7 +32,7 @@ var valueAddCmd = &cobra.Command{
 		createdAt := time.Now()
 		if cmd.Flags().Changed("at") {
 			var err error
-			createdAt, err = sqlite.ParseTime(valueAddAt)
+			createdAt, err = parse.ParseTime(valueAddAt)
 			if err != nil {
 				return err
 			}
@@ -43,7 +45,7 @@ var valueAddCmd = &cobra.Command{
 		if _, err := vs.CreateMetricValue(mv); err != nil {
 			return err
 		}
-		fmt.Printf("Metric value added nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(sqlite.TimeLayout))
+		fmt.Printf("Metric value added nigga - metricID: %d, value: %.2f, createdAt: %s\n", mv.MetricID, mv.Value, mv.CreatedAt.Format(parse.TimeLayout))
 		return nil
 	},
 }
@@ -72,7 +74,7 @@ var valueUpdateCmd = &cobra.Command{
 		if _, err := vs.UpdateMetricValue(mv); err != nil {
 			return err
 		}
-		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, updatedAt: %s\n", mv.MetricID, mv.Value, mv.UpdatedAt.Format(sqlite.TimeLayout))
+		fmt.Printf("Metric value update nigga - metricID: %d, value: %.2f, updatedAt: %s\n", mv.MetricID, mv.Value, mv.UpdatedAt.Format(parse.TimeLayout))
 		return nil
 	},
 }
@@ -102,7 +104,7 @@ var valueListCmd = &cobra.Command{
 		}
 		fmt.Printf("Values of metric %d:\n", metricID)
 		for _, mv := range mvs {
-			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(sqlite.TimeLayout))
+			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(parse.TimeLayout))
 		}
 		return nil
 	},
@@ -124,24 +126,48 @@ var valueDeleteCmd = &cobra.Command{
 	},
 }
 
-//	var valueImportCmd = &cobra.Command{
-//		Use:   "import",
-//		Short: "Bulk import metric values",
-//		Args:  cobra.NoArgs,
-//		RunE: func(cmd *cobra.Command, args []string) error {
-//			// first parse - this is a separete interface inside of csv package. return metricValues
-//			// interface: accept path to the file, return metric values
-//			// secondly - get an array of metrics and pass them to the writer
-//			// interface writeMetrics(db, mvs) (int, err) where int is the number of errors that was written
-//			rowsAffected, err := reader.readMetricValues(db)
-//			rowsAffected, err := sqlite.DeleteMetricValueByID(db, valueDeleteValueID)
-//			if err != nil {
-//				return err
-//			}
-//			fmt.Printf("Value deleted, rows affected: %d\n", rowsAffected)
-//			return nil
-//		},
-//	}
+var (
+	valueImportID     int
+	valueImportMetric string
+	valueImportFile   string
+)
+
+var valueImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Bulk import metric values from a CSV file",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		metricID, err := ms.ResolveMetricID(valueImportID, valueImportMetric)
+		if err != nil {
+			return err
+		}
+		// parse it all before touching the db - a bad last row imports nothing
+		var mvs []*meth.MetricValue
+		switch ext := strings.ToLower(filepath.Ext(valueImportFile)); ext {
+		case ".csv":
+			mvs, err = parse.CSV(valueImportFile, metricID)
+		case ".json":
+			mvs, err = parse.HealthExportWeight(valueImportFile, metricID)
+		default:
+			return fmt.Errorf("don't know how to read %q, want .csv or .json", ext)
+		}
+		if err != nil {
+			return err
+		}
+		if len(mvs) == 0 {
+			fmt.Printf("No values in %s, nothing imported\n", valueImportFile)
+			return nil
+		}
+		res, err := vs.CreateMetricValues(mvs)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Imported %s into metric %d: %d new, %d updated, %d already there\n",
+			valueImportFile, metricID, res.Inserted, res.Updated, res.Unchanged)
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(valueCmd)
 
@@ -173,6 +199,11 @@ func init() {
 	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "id", 0, "value ID")
 	valueDeleteCmd.MarkFlagRequired("id")
 
-	// valueCmd.AddCommand(valueImportCmd)
-	// valueImportCmd.Flags().StringVarP(%)
+	valueCmd.AddCommand(valueImportCmd)
+	valueImportCmd.Flags().IntVar(&valueImportID, "id", 0, "metric ID")
+	valueImportCmd.Flags().StringVarP(&valueImportMetric, "metric", "m", "", "metric name, alternative to --id")
+	valueImportCmd.Flags().StringVarP(&valueImportFile, "file", "f", "", "file to import: .csv with value,created_at columns or a Health Export .json")
+	valueImportCmd.MarkFlagsOneRequired("id", "metric")
+	valueImportCmd.MarkFlagsMutuallyExclusive("id", "metric")
+	valueImportCmd.MarkFlagRequired("file")
 }
