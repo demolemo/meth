@@ -8,6 +8,8 @@ import (
 	"github.com/demolemo/meth"
 )
 
+var _ meth.MetricService = (*MetricService)(nil)
+
 type MetricService struct {
 	db *sql.DB
 }
@@ -29,7 +31,10 @@ func (ms *MetricService) CreateMetric(m *meth.Metric) (int64, error) {
 	return rowsAffected, nil
 }
 
-// returns nil, nil when there is no metric with that id
+// returns an error when there is no metric with that id.
+// NOTE: GetMetricByName returns nil, nil for the same situation. two
+// different not-found contracts on one service, pick one and make it a
+// sentinel error both can return
 func (ms *MetricService) GetMetricByID(id int) (*meth.Metric, error) {
 	sqlQuery := `
 		SELECT * FROM metrics WHERE id = $id

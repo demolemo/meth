@@ -8,6 +8,10 @@ import (
 	"github.com/demolemo/meth"
 )
 
+// the interface in the meth package is the contract, this line is what
+// makes a rename here a build failure instead of silent drift
+var _ meth.ValueService = (*ValueService)(nil)
+
 type ValueService struct {
 	db *sql.DB
 }
@@ -106,19 +110,12 @@ func (vs *ValueService) DeleteMetricValue(valueID int) (int64, error) {
 	return rowsAffected, nil
 }
 
-// ImportResult counts what a batch did.
-type ImportResult struct {
-	Inserted  int
-	Updated   int
-	Unchanged int
-}
-
 // CreateMetricValues writes a batch in one transaction, treating
 // (metric_id, created_at) as a reading's identity: re-importing an overlapping
 // export changes nothing unless the number did. Two statements rather than an
 // upsert because no unique index backs that pair.
-func (vs *ValueService) CreateMetricValues(mvs []*meth.MetricValue) (ImportResult, error) {
-	var res ImportResult
+func (vs *ValueService) CreateMetricValues(mvs []*meth.MetricValue) (meth.ImportResult, error) {
+	var res meth.ImportResult
 
 	tx, err := vs.db.Begin()
 	if err != nil {

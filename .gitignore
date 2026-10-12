@@ -1,4 +1,11 @@
+# sqlite databases, at any depth
 *.db
-# not sure if the previous pattern matches on tables that are inside dirs
-*/*.db 
-meth
+*.db-journal
+*.db-wal
+
+# build output
+/bin/
+# a stray `go build` in the repo root or in cmd/meth
+/meth
+/cmd/cmd
+/cmd/meth/meth
