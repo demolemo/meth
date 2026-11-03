@@ -3,6 +3,7 @@ package parse
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -33,30 +34,43 @@ type healthExport struct {
 // of metricID. The file gives a date and no clock time, so a reading lands at
 // midnight in the export's own zone, not the machine's.
 func HealthExportWeight(path string, metricID int) ([]*meth.MetricValue, error) {
-	raw, err := os.ReadFile(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return HealthExportWeightFrom(f, path, metricID)
+}
+
+// HealthExportWeightFrom is HealthExportWeight over an open export. source
+// only names it in error messages, so a request body can say so.
+func HealthExportWeightFrom(r io.Reader, source string, metricID int) ([]*meth.MetricValue, error) {
+	// read then unmarshal, not a streaming decode: Unmarshal rejects trailing
+	// garbage after the object and the decoder accepts it
+	raw, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 
 	var export healthExport
 	if err := json.Unmarshal(raw, &export); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+		return nil, fmt.Errorf("%s: %w", source, err)
 	}
 
 	body := export.Additional.Body
 	if len(body.Daily) == 0 {
-		return nil, fmt.Errorf("%s: no additional.body.daily rows, was the export made with the body category?", path)
+		return nil, fmt.Errorf("%s: no additional.body.daily rows, was the export made with the body category?", source)
 	}
 	// value is a bare float in the db, so pounds would be stored as kilograms
 	if unit := body.Units["bodyMass"]; unit != "kg" {
-		return nil, fmt.Errorf("%s: bodyMass unit is %q, want kg", path, unit)
+		return nil, fmt.Errorf("%s: bodyMass unit is %q, want kg", source, unit)
 	}
 
 	loc := time.Local
 	if export.Meta.TimeZone != "" {
 		loc, err = time.LoadLocation(export.Meta.TimeZone)
 		if err != nil {
-			return nil, fmt.Errorf("%s: meta.timeZone: %w", path, err)
+			return nil, fmt.Errorf("%s: meta.timeZone: %w", source, err)
 		}
 	}
 
@@ -68,7 +82,7 @@ func HealthExportWeight(path string, metricID int) ([]*meth.MetricValue, error) 
 		}
 		createdAt, err := time.ParseInLocation(dateLayout, day.Date, loc)
 		if err != nil {
-			return nil, fmt.Errorf("%s: date %q: %w", path, day.Date, err)
+			return nil, fmt.Errorf("%s: date %q: %w", source, day.Date, err)
 		}
 		mvs = append(mvs, &meth.MetricValue{
 			MetricID:  metricID,

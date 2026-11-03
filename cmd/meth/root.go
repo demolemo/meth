@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"os"
 
+	"github.com/demolemo/meth"
 	"github.com/demolemo/meth/config"
 	"github.com/demolemo/meth/sqlite"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 )
 
@@ -14,8 +14,8 @@ import (
 // runs and closed again after it
 var (
 	db *sql.DB
-	ms *sqlite.MetricService
-	vs *sqlite.ValueService
+	ms meth.MetricService
+	vs meth.ValueService
 )
 
 // --db, wins over the config file

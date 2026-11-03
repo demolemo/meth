@@ -22,10 +22,8 @@ type MetricUpdate struct {
 // lookups instead of returning a nil *Metric with a nil error, the writes
 // instead of returning 0 rows affected and no error. So no caller has to
 // nil-check or count rows to find out whether anything happened.
-//
-// NOTE: we should remove int64 as param for all those methods, only viable inside of the sqlite
 type MetricService interface {
-	CreateMetric(m *Metric) (int64, error)
+	CreateMetric(m *Metric) error
 
 	// wraps ErrNotFound when no metric has that id
 	GetMetricByID(id int) (*Metric, error)
@@ -40,11 +38,11 @@ type MetricService interface {
 
 	// wraps ErrNotFound when no metric has that id, so a rename that matched
 	// nothing is an error and not a report of 0 rows affected
-	UpdateMetricByID(mu *MetricUpdate) (int64, error)
+	UpdateMetricByID(mu *MetricUpdate) error
 
 	// both wrap ErrNotFound when there was nothing to delete
-	DeleteMetricByID(id int) (int64, error)
-	DeleteMetricByName(name string) (int64, error)
+	DeleteMetricByID(id int) error
+	DeleteMetricByName(name string) error
 
 	// resolve metric id to not duplicate all of the functionality by name.
 	// a non-zero id wins, otherwise the name is looked up. wraps ErrNotFound

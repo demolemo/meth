@@ -28,11 +28,11 @@ var metricCreateCmd = &cobra.Command{
 		if strings.TrimSpace(metricCreateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
-		rowsAffected, err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName})
+		err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName})
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Metric created, rows affected: %d\n", rowsAffected)
+		fmt.Printf("Metric created\n")
 		return nil
 	},
 }
@@ -76,11 +76,11 @@ var metricUpdateCmd = &cobra.Command{
 		if strings.TrimSpace(metricUpdateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
-		rowsAffected, err := ms.UpdateMetricByID(&meth.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
+		err := ms.UpdateMetricByID(&meth.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Metric updated, rows affected: %d\n", rowsAffected)
+		fmt.Printf("Metric updated\n")
 		return nil
 	},
 }
@@ -101,11 +101,11 @@ var metricDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		rowsAffected, err := ms.DeleteMetricByID(metricID)
+		err = ms.DeleteMetricByID(metricID)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Metric deleted, rows affected: %d\n", rowsAffected)
+		fmt.Printf("Metric deleted\n")
 		return nil
 	},
 }

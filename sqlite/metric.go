@@ -18,17 +18,22 @@ func NewMetricService(db *sql.DB) *MetricService {
 	return &MetricService{db: db}
 }
 
-func (ms *MetricService) CreateMetric(m *meth.Metric) (int64, error) {
+var ErrNotOneAffected = errors.New("Not one row affected after operation")
+
+func (ms *MetricService) CreateMetric(m *meth.Metric) error {
 	sqlQuery := `INSERT INTO metrics VALUES($1, $2)`
 	res, err := ms.db.Exec(sqlQuery, m.ID, m.Name)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return rowsAffected, nil
+	if rowsAffected != 0 {
+		return ErrNotOneAffected
+	}
+	return nil
 }
 
 // wraps meth.ErrNotFound when no metric has that id
@@ -88,20 +93,23 @@ func (ms *MetricService) GetMetrics() ([]*meth.Metric, error) {
 //
 // should the ID be primary key that we can affect? the name should be identifier too
 // return *Metric here
-func (ms *MetricService) UpdateMetricByID(mu *meth.MetricUpdate) (int64, error) {
+func (ms *MetricService) UpdateMetricByID(mu *meth.MetricUpdate) error {
 	sqlQuery := `UPDATE metrics SET name = $1 WHERE id = $2`
 	res, err := ms.db.Exec(sqlQuery, mu.Name, mu.ID)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if rowsAffected == 0 {
-		return 0, fmt.Errorf("metric %d: %w", mu.ID, meth.ErrNotFound)
+		return fmt.Errorf("metric %d: %w", mu.ID, meth.ErrNotFound)
 	}
-	return rowsAffected, nil
+	if rowsAffected != 1 {
+		return ErrNotOneAffected
+	}
+	return nil
 }
 
 // wraps meth.ErrNotFound when no metric has that id.
@@ -109,38 +117,45 @@ func (ms *MetricService) UpdateMetricByID(mu *meth.MetricUpdate) (int64, error) 
 // a metric that still has values fails on the foreign key instead, which is
 // the open question in the README: do values get deleted first, or is this
 // supposed to cascade?
-func (ms *MetricService) DeleteMetricByID(id int) (int64, error) {
+func (ms *MetricService) DeleteMetricByID(id int) error {
 	sqlQuery := `DELETE FROM metrics WHERE id = $1`
 	res, err := ms.db.Exec(sqlQuery, id)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if rowsAffected == 0 {
-		return 0, fmt.Errorf("metric %d: %w", id, meth.ErrNotFound)
+		return fmt.Errorf("metric %d: %w", id, meth.ErrNotFound)
 	}
-	return rowsAffected, nil
+	// this logic might be a little bit redundant
+	if rowsAffected != 1 {
+		return ErrNotOneAffected
+	}
+	return nil
 }
 
 // case-insensitive, matching GetMetricByName and the unique index.
 // wraps meth.ErrNotFound when no metric has that name
-func (ms *MetricService) DeleteMetricByName(name string) (int64, error) {
+func (ms *MetricService) DeleteMetricByName(name string) error {
 	sqlQuery := `DELETE FROM metrics WHERE name = $1 COLLATE NOCASE`
 	res, err := ms.db.Exec(sqlQuery, name)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if rowsAffected == 0 {
-		return 0, fmt.Errorf("metric %q: %w", name, meth.ErrNotFound)
+		return fmt.Errorf("metric %q: %w", name, meth.ErrNotFound)
 	}
-	return rowsAffected, nil
+	if rowsAffected != 1 {
+		return ErrNotOneAffected
+	}
+	return nil
 }
 
 // a non-zero id wins, otherwise the name is looked up. Either way the metric
