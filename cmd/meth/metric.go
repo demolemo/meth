@@ -140,6 +140,7 @@ func init() {
 	metricCmd.AddCommand(metricCreateCmd)
 	metricCreateCmd.Flags().IntVar(&metricCreateID, "id", 0, "metric ID")
 	metricCreateCmd.Flags().StringVarP(&metricCreateName, "name", "n", "", "metric name")
+	// this should not be required, for now it is
 	metricCreateCmd.MarkFlagRequired("id")
 	metricCreateCmd.MarkFlagRequired("name")
 
