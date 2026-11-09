@@ -1,10 +1,12 @@
-package parse
+package tests
 
 import (
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/demolemo/meth/parse"
 )
 
 const bodyExport = `{
@@ -72,7 +74,7 @@ func TestHealthExportWeightFrom(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			mvs, err := HealthExportWeightFrom(strings.NewReader(c.body), "test", 7)
+			mvs, err := parse.HealthExportWeightFrom(strings.NewReader(c.body), "test", 7)
 			if c.wantErr != "" {
 				if err == nil {
 					t.Fatalf("want error containing %q, got %d values", c.wantErr, len(mvs))
