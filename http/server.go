@@ -39,7 +39,6 @@ func (s *Server) registerRoutes() {
 }
 
 func (s *Server) Serve() error {
-	fmt.Printf("we were before here")
 	return s.server.ListenAndServe()
 }
 

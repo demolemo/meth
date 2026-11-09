@@ -112,13 +112,24 @@ build failure instead of silent drift.
 - [x] add a convention for adding metric by `name`, names are case insensitive and cannot be empty
 - [x] `import` from CSV. - landed as `value import -f`, which also reads a Health Export `.json`
 - [x] structure subcommands using flags
-- [ ] tests? fuzzy testing with AI or something.
 - [x] `value list` - the command to display the recent values (`limit, id` - flags that needed for this command)
 - [x] `value update` - what is the best interface for this? we want to update using the id?
 - [x] `value delete` - using the `id` or using the `date` (this should be easy), what happens when values with given ids don't exist anymore - for now we delete values only by `id`, values with given ids just collapse. that leads to some values going not after each other.
 - [ ] graphs? - it would be nice to display the metric along the period of time. this is additional functionality.
 - [ ] web server to use the API - this is the most interesting part for me. because i don't completely understand how to serve the API over the endpoint. this looks messy for me.
-- [ ] general idea includes stuff like automatic execution but i'm not sure that this belongs in the scope of this project. what did i mean here but automatic execution. i think it was 
+
+
+# Current state of the system
+Removing the `UPDATE` method from the system. We sacrifice an ability to update metric name but gain stable URLs across all metric lifecycle.
+If rename would be really needed we can do something like: `meth export -> meth metric delete <name> -> meth create <new_name> -> meth import`.
+The path is a little bit messy but for now I assume that we would not need renaming that much since names are meant to depict what's happening inside of the metric.
+
+Therefore there are several tasks ahead (all are implications of `ID` becoming fully internal):
+- [ ] remove access by `ID` in methods like `CreateMetric`, `GetMetric`
+- [ ] change the interface of the metric service to fall into rule above
+- [ ] remove `UpdateMetric` method entirely
+
+Also, an important point is that we are handling only **SCALAR** metrics currently. It's not intended state of the project but for now we are cleaning up everything to make sure it works with scalars nicely.
 
 
 # Open questions

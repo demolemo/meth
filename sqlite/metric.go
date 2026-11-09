@@ -20,6 +20,8 @@ func NewMetricService(db *sql.DB) *MetricService {
 
 var ErrNotOneAffected = errors.New("Not one row affected after operation")
 
+// here we should also update the metric under the metric pointer with ID
+// if pointer arrives without an ID which should be expected
 func (ms *MetricService) CreateMetric(m *meth.Metric) error {
 	sqlQuery := `INSERT INTO metrics VALUES($1, $2)`
 	res, err := ms.db.Exec(sqlQuery, m.ID, m.Name)
@@ -30,7 +32,7 @@ func (ms *MetricService) CreateMetric(m *meth.Metric) error {
 	if err != nil {
 		return err
 	}
-	if rowsAffected != 0 {
+	if rowsAffected != 1 {
 		return ErrNotOneAffected
 	}
 	return nil
