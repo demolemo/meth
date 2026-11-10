@@ -58,7 +58,7 @@ func describeDB(path string) string {
 	}
 	defer db.Close()
 
-	mets, err := sqlite.NewMetricService(db).GetMetrics()
+	mets, err := sqlite.NewMetricService(db).GetMetrics(-1)
 	if err != nil {
 		return err.Error()
 	}

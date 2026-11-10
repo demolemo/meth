@@ -15,7 +15,6 @@ var metricCmd = &cobra.Command{
 }
 
 var (
-	metricCreateID   int
 	metricCreateName string
 )
 
@@ -28,7 +27,7 @@ var metricCreateCmd = &cobra.Command{
 		if strings.TrimSpace(metricCreateName) == "" {
 			return fmt.Errorf("metric name can't be empty")
 		}
-		err := ms.CreateMetric(&meth.Metric{ID: metricCreateID, Name: metricCreateName})
+		err := ms.CreateMetric(&meth.Metric{Name: metricCreateName})
 		if err != nil {
 			return err
 		}
@@ -37,10 +36,7 @@ var metricCreateCmd = &cobra.Command{
 	},
 }
 
-var (
-	metricFindID   int
-	metricFindName string
-)
+var metricFindName string
 
 var metricFindCmd = &cobra.Command{
 	Use:   "find",
@@ -48,12 +44,7 @@ var metricFindCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		quietUsage(cmd)
-		metricID, err := ms.ResolveMetricID(metricFindID, metricFindName)
-		if err != nil {
-			return err
-		}
-
-		met, err := ms.GetMetricByID(metricID)
+		met, err := ms.GetMetric(metricFindName)
 		if err != nil {
 			return err
 		}
@@ -62,33 +53,7 @@ var metricFindCmd = &cobra.Command{
 	},
 }
 
-var (
-	metricUpdateID   int
-	metricUpdateName string
-)
-
-var metricUpdateCmd = &cobra.Command{
-	Use:   "update",
-	Short: "Rename a metric",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		quietUsage(cmd)
-		if strings.TrimSpace(metricUpdateName) == "" {
-			return fmt.Errorf("metric name can't be empty")
-		}
-		err := ms.UpdateMetricByID(&meth.MetricUpdate{ID: metricUpdateID, Name: metricUpdateName})
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Metric updated\n")
-		return nil
-	},
-}
-
-var (
-	metricDeleteID   int
-	metricDeleteName string
-)
+var metricDeleteName string
 
 var metricDeleteCmd = &cobra.Command{
 	Use:   "delete",
@@ -96,12 +61,7 @@ var metricDeleteCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		quietUsage(cmd)
-		metricID, err := ms.ResolveMetricID(metricDeleteID, metricDeleteName)
-		if err != nil {
-			return err
-		}
-
-		err = ms.DeleteMetricByID(metricID)
+		err := ms.DeleteMetric(metricDeleteName)
 		if err != nil {
 			return err
 		}
@@ -110,14 +70,15 @@ var metricDeleteCmd = &cobra.Command{
 	},
 }
 
+var metricListLimit int
+
 var metricListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List metrics (first 5)",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		quietUsage(cmd)
-		// NOTE: change for a function with limit, repeat once again
-		mets, err := ms.GetMetrics()
+		mets, err := ms.GetMetrics(metricListLimit)
 		if err != nil {
 			return err
 		}
@@ -138,29 +99,17 @@ func init() {
 	rootCmd.AddCommand(metricCmd)
 
 	metricCmd.AddCommand(metricCreateCmd)
-	metricCreateCmd.Flags().IntVar(&metricCreateID, "id", 0, "metric ID")
-	metricCreateCmd.Flags().StringVarP(&metricCreateName, "name", "n", "", "metric name")
-	// this should not be required, for now it is
-	metricCreateCmd.MarkFlagRequired("id")
+	// NOTE: a little bit poor job because we name NAME METRIC but this keeps everything else consisstent
+	metricCreateCmd.Flags().StringVarP(&metricCreateName, "metric", "m", "", "metric name")
 	metricCreateCmd.MarkFlagRequired("name")
 
 	metricCmd.AddCommand(metricFindCmd)
-	metricFindCmd.Flags().IntVar(&metricFindID, "id", 0, "metric ID")
 	metricFindCmd.Flags().StringVarP(&metricFindName, "metric", "m", "", "metric name, alternative to id flag")
-	metricFindCmd.MarkFlagsOneRequired("id", "metric")
-	metricFindCmd.MarkFlagsMutuallyExclusive("id", "metric")
-
-	metricCmd.AddCommand(metricUpdateCmd)
-	metricUpdateCmd.Flags().IntVar(&metricUpdateID, "id", 0, "metric ID")
-	metricUpdateCmd.Flags().StringVarP(&metricUpdateName, "name", "n", "", "new metric name")
-	metricUpdateCmd.MarkFlagRequired("id")
-	metricUpdateCmd.MarkFlagRequired("name")
+	metricFindCmd.MarkFlagRequired("metric")
 
 	metricCmd.AddCommand(metricDeleteCmd)
-	metricDeleteCmd.Flags().IntVar(&metricDeleteID, "id", 0, "metric ID")
 	metricDeleteCmd.Flags().StringVarP(&metricDeleteName, "metric", "m", "", "metric name, alternative to id flag")
-	metricDeleteCmd.MarkFlagsOneRequired("id", "metric")
-	metricDeleteCmd.MarkFlagsMutuallyExclusive("id", "metric")
+	metricDeleteCmd.MarkFlagRequired("metric")
 
 	metricCmd.AddCommand(metricListCmd)
 }

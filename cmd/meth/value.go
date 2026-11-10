@@ -18,7 +18,6 @@ var valueCmd = &cobra.Command{
 }
 
 var (
-	valueAddID     int
 	valueAddMetric string
 	valueAddValue  float64
 	valueAddAt     string
@@ -38,11 +37,12 @@ var valueAddCmd = &cobra.Command{
 				return err
 			}
 		}
-		metricID, err := ms.ResolveMetricID(valueAddID, valueAddMetric)
+		m, err := ms.GetMetric(valueAddMetric)
 		if err != nil {
 			return err
 		}
-		mv := &meth.MetricValue{MetricID: metricID, Value: valueAddValue, CreatedAt: createdAt}
+		// FUCK, now we have to change the interface here
+		mv := &meth.MetricValue{MetricID: m.ID, Value: valueAddValue, CreatedAt: createdAt}
 		if _, err := vs.CreateMetricValue(mv); err != nil {
 			return err
 		}
@@ -79,7 +79,6 @@ var valueUpdateCmd = &cobra.Command{
 }
 
 var (
-	valueListMetricID   int
 	valueListMetricName string
 	valueListLimit      int
 )
@@ -90,19 +89,19 @@ var valueListCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		quietUsage(cmd)
-		metricID, err := ms.ResolveMetricID(valueListMetricID, valueListMetricName)
+		m, err := ms.GetMetric(valueListMetricName)
 		if err != nil {
 			return err
 		}
-		mvs, err := vs.GetMetricValues(metricID, valueListLimit)
+		mvs, err := vs.GetMetricValues(m.ID, valueListLimit)
 		if err != nil {
 			return err
 		}
 		if len(mvs) == 0 {
-			fmt.Printf("No values for metric %d\n", metricID)
+			fmt.Printf("No values for metric %s\n", m.Name)
 			return nil
 		}
-		fmt.Printf("Values of metric %d:\n", metricID)
+		fmt.Printf("Values of metric %s:\n", m.Name)
 		for _, mv := range mvs {
 			fmt.Printf("\tValue, ID: %d, Value: %g, CreatedAt: %s\n", mv.ID, mv.Value, mv.CreatedAt.Local().Format(parse.TimeLayout))
 		}
@@ -128,7 +127,6 @@ var valueDeleteCmd = &cobra.Command{
 }
 
 var (
-	valueImportID     int
 	valueImportMetric string
 	valueImportFile   string
 )
@@ -139,7 +137,7 @@ var valueImportCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		quietUsage(cmd)
-		metricID, err := ms.ResolveMetricID(valueImportID, valueImportMetric)
+		m, err := ms.GetMetric(valueImportMetric)
 		if err != nil {
 			return err
 		}
@@ -147,9 +145,9 @@ var valueImportCmd = &cobra.Command{
 		var mvs []*meth.MetricValue
 		switch ext := strings.ToLower(filepath.Ext(valueImportFile)); ext {
 		case ".csv":
-			mvs, err = parse.CSV(valueImportFile, metricID)
+			mvs, err = parse.CSV(valueImportFile, m.ID)
 		case ".json":
-			mvs, err = parse.HealthExportWeight(valueImportFile, metricID)
+			mvs, err = parse.HealthExportWeight(valueImportFile, m.ID)
 		default:
 			return fmt.Errorf("don't know how to read %q, want .csv or .json", ext)
 		}
@@ -164,8 +162,8 @@ var valueImportCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Imported %s into metric %d: %d new, %d updated, %d already there\n",
-			valueImportFile, metricID, res.Inserted, res.Updated, res.Unchanged)
+		fmt.Printf("Imported %s into metric %s: %d new, %d updated, %d already there\n",
+			valueImportFile, m.Name, res.Inserted, res.Updated, res.Unchanged)
 		return nil
 	},
 }
@@ -174,12 +172,10 @@ func init() {
 	rootCmd.AddCommand(valueCmd)
 
 	valueCmd.AddCommand(valueAddCmd)
-	valueAddCmd.Flags().IntVar(&valueAddID, "id", 0, "metric ID")
-	valueAddCmd.Flags().StringVarP(&valueAddMetric, "metric", "m", "", "metric name, alternative to --id")
+	valueAddCmd.Flags().StringVarP(&valueAddMetric, "metric", "m", "", "metric name")
 	valueAddCmd.Flags().Float64VarP(&valueAddValue, "value", "v", 0, "value to record")
 	valueAddCmd.Flags().StringVar(&valueAddAt, "at", "", `created_at, "2006-01-02 15:04" (default now)`)
-	valueAddCmd.MarkFlagsOneRequired("id", "metric")
-	valueAddCmd.MarkFlagsMutuallyExclusive("id", "metric")
+	valueAddCmd.MarkFlagRequired("metric")
 	valueAddCmd.MarkFlagRequired("value")
 
 	valueCmd.AddCommand(valueUpdateCmd)
@@ -189,21 +185,17 @@ func init() {
 	valueUpdateCmd.MarkFlagRequired("value")
 
 	valueCmd.AddCommand(valueListCmd)
-	valueListCmd.Flags().IntVar(&valueListMetricID, "id", 0, "metric ID")
-	valueListCmd.Flags().StringVarP(&valueListMetricName, "metric", "m", "", "metric name, alternative to --id")
+	valueListCmd.Flags().StringVarP(&valueListMetricName, "metric", "m", "", "metric name")
 	valueListCmd.Flags().IntVar(&valueListLimit, "limit", 5, "max values to show, -1 for all")
-	valueListCmd.MarkFlagsOneRequired("id", "metric")
-	valueListCmd.MarkFlagsMutuallyExclusive("id", "metric")
+	valueListCmd.MarkFlagRequired("metric")
 
 	valueCmd.AddCommand(valueDeleteCmd)
 	valueDeleteCmd.Flags().IntVar(&valueDeleteValueID, "id", 0, "value ID")
 	valueDeleteCmd.MarkFlagRequired("id")
 
 	valueCmd.AddCommand(valueImportCmd)
-	valueImportCmd.Flags().IntVar(&valueImportID, "id", 0, "metric ID")
-	valueImportCmd.Flags().StringVarP(&valueImportMetric, "metric", "m", "", "metric name, alternative to --id")
+	valueImportCmd.Flags().StringVarP(&valueImportMetric, "metric", "m", "", "metric name")
 	valueImportCmd.Flags().StringVarP(&valueImportFile, "file", "f", "", "file to import: .csv with value,created_at columns or a Health Export .json")
-	valueImportCmd.MarkFlagsOneRequired("id", "metric")
-	valueImportCmd.MarkFlagsMutuallyExclusive("id", "metric")
+	valueImportCmd.MarkFlagRequired("metric")
 	valueImportCmd.MarkFlagRequired("file")
 }

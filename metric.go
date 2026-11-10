@@ -5,13 +5,8 @@
 package meth
 
 type Metric struct {
-	ID   int `json:"id"`
+	ID   int    `json:"id"`
 	Name string `json:"name"`
-}
-
-type MetricUpdate struct {
-	ID   int
-	Name string
 }
 
 // MetricService is what sqlite.MetricService implements, asserted at compile
@@ -25,27 +20,17 @@ type MetricUpdate struct {
 type MetricService interface {
 	CreateMetric(m *Metric) error
 
-	// wraps ErrNotFound when no metric has that id
-	GetMetricByID(id int) (*Metric, error)
-
 	// case-insensitive, matching the unique index on metrics.name.
 	// wraps ErrNotFound when no metric has that name
-	GetMetricByName(name string) (*Metric, error)
+	GetMetric(name string) (*Metric, error)
 
-	// returns all metrics that exist in the service?
-	// maybe we should add a limit here because this unbound behaviour is unsound
-	GetMetrics() ([]*Metric, error)
+	// returns <limit> number of metrics that exist in the service
+	// metrics are sorted by an internal ID
+	// NOTE: this could be an issue because after deletion
+	// new metric could receive lower ID than the last stored metric
+	// (sqlite works in that manner)
+	GetMetrics(limit int) ([]*Metric, error)
 
-	// wraps ErrNotFound when no metric has that id, so a rename that matched
-	// nothing is an error and not a report of 0 rows affected
-	UpdateMetricByID(mu *MetricUpdate) error
-
-	// both wrap ErrNotFound when there was nothing to delete
-	DeleteMetricByID(id int) error
-	DeleteMetricByName(name string) error
-
-	// resolve metric id to not duplicate all of the functionality by name.
-	// a non-zero id wins, otherwise the name is looked up. wraps ErrNotFound
-	// if the metric is not there either way
-	ResolveMetricID(id int, name string) (int, error)
+	// wrap ErrNotFound when there was nothing to delete
+	DeleteMetric(name string) error
 }

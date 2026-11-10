@@ -30,11 +30,10 @@ func NewServer(db *sql.DB) *Server {
 
 func (s *Server) registerRoutes() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /metric", s.handleMetricList)
-	mux.HandleFunc("POST /metric", s.handleMetricCreate)
-	mux.HandleFunc("GET /metric/{id}", s.handleMetricGet)
-	mux.HandleFunc("PATCH /metric/{id}", s.handleMetricUpdate)
-	mux.HandleFunc("DELETE /metric/{id}", s.handleMetricDelete)
+	mux.HandleFunc("GET /metrics", s.handleMetricList)
+	mux.HandleFunc("POST /metrics", s.handleMetricCreate)
+	mux.HandleFunc("GET /metrics/{name}", s.handleMetricGet)
+	mux.HandleFunc("DELETE /metrics/{name}", s.handleMetricDelete)
 	s.server.Handler = mux
 }
 
@@ -42,12 +41,18 @@ func (s *Server) Serve() error {
 	return s.server.ListenAndServe()
 }
 
-func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("ping ok"))
-}
-
 func (s *Server) handleMetricList(w http.ResponseWriter, r *http.Request) {
-	metrics, err := s.ms.GetMetrics()
+	limit := -1 // all
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(w, "limit must be an integer", http.StatusBadRequest)
+			return
+		}
+		limit = n
+	}
+
+	metrics, err := s.ms.GetMetrics(limit)
 	if err != nil {
 		http.Error(w, "Getting metrics failed: "+err.Error(), http.StatusBadRequest)
 		return
@@ -79,19 +84,15 @@ func (s *Server) handleMetricCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "metric creation failed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	w.Write([]byte(fmt.Sprintf("Metric created, id: %d, name: %s", met.ID, met.Name)))
+	w.Write(fmt.Appendf(nil, "Metric created, id: %d, name: %s\n", met.ID, met.Name))
 }
 
 func (s *Server) handleMetricGet(w http.ResponseWriter, r *http.Request) {
 	// decode metric id
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		// TODO: throw server error
-		return
-	}
+	name := r.PathValue("name")
 
 	// fetch metric from the db
-	metric, err := s.ms.GetMetricByID(id)
+	metric, err := s.ms.GetMetric(name)
 	if err != nil {
 		// TODO: throw server error
 		// Error(w, r, err)
@@ -123,24 +124,15 @@ func (s *Server) handleMetricGet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleMetricUpdate(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func (s *Server) handleMetricDelete(w http.ResponseWriter, r *http.Request) {
-	// decode metric id
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "id decoding failed: "+err.Error(), http.StatusBadRequest)
-		return
-	}
+	// get metric name from URL
+	name := r.PathValue("name")
 
 	// delete metric from the db
-	err = s.ms.DeleteMetricByID(id)
+	err := s.ms.DeleteMetric(name)
 	if err != nil {
 		http.Error(w, "metric deletion failed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	w.Write([]byte(fmt.Sprintf("Metric deletion success, id: %d\n", id)))
-
+	w.WriteHeader(http.StatusNoContent)
 }

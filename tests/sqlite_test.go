@@ -20,16 +20,11 @@ func TestNotFoundIsCatchable(t *testing.T) {
 	vs := sqlite.NewValueService(db)
 
 	cases := map[string]func() error{
-		"GetMetricByID":      func() error { _, err := ms.GetMetricByID(999); return err },
-		"GetMetricByName":    func() error { _, err := ms.GetMetricByName("nope"); return err },
-		"ResolveMetricID/id": func() error { _, err := ms.ResolveMetricID(999, ""); return err },
-		"ResolveMetricID/nm": func() error { _, err := ms.ResolveMetricID(0, "nope"); return err },
-		"UpdateMetricByID":   func() error { return ms.UpdateMetricByID(&meth.MetricUpdate{ID: 999, Name: "x"}) },
-		"DeleteMetricByID":   func() error { return ms.DeleteMetricByID(999) },
-		"DeleteMetricByName": func() error { return ms.DeleteMetricByName("nope") },
-		"GetMetricValue":     func() error { _, err := vs.GetMetricValue(999); return err },
-		"UpdateMetricValue":  func() error { _, err := vs.UpdateMetricValue(&meth.MetricValue{ID: 999}); return err },
-		"DeleteMetricValue":  func() error { _, err := vs.DeleteMetricValue(999); return err },
+		"GetMetric":         func() error { _, err := ms.GetMetric("nope"); return err },
+		"DeleteMetric":      func() error { return ms.DeleteMetric("nope") },
+		"GetMetricValue":    func() error { _, err := vs.GetMetricValue(999); return err },
+		"UpdateMetricValue": func() error { _, err := vs.UpdateMetricValue(&meth.MetricValue{ID: 999}); return err },
+		"DeleteMetricValue": func() error { _, err := vs.DeleteMetricValue(999); return err },
 	}
 
 	for name, call := range cases {

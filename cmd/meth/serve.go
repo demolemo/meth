@@ -1,3 +1,4 @@
+// TODO: consolidate this functionality into the methd part
 package main
 
 import (
@@ -77,13 +78,13 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metricID, err := ms.ResolveMetricID(0, name)
+	m, err := ms.GetMetric(name)
 	if err != nil {
 		writeError(w, statusFor(err), err)
 		return
 	}
 
-	mvs, err := parse.HealthExportWeightFrom(http.MaxBytesReader(w, r.Body, maxImportBytes), "request body", metricID)
+	mvs, err := parse.HealthExportWeightFrom(http.MaxBytesReader(w, r.Body, maxImportBytes), "request body", m.ID)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
