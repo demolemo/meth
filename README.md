@@ -125,11 +125,23 @@ If rename would be really needed we can do something like: `meth export -> meth 
 The path is a little bit messy but for now I assume that we would not need renaming that much since names are meant to depict what's happening inside of the metric.
 
 Therefore there are several tasks ahead (all are implications of `ID` becoming fully internal):
-- [ ] remove access by `ID` in methods like `CreateMetric`, `GetMetric`
-- [ ] change the interface of the metric service to fall into rule above
-- [ ] remove `UpdateMetric` method entirely
+- [x] remove access by `ID` in methods like `CreateMetric`, `GetMetric`
+- [x] change the interface of the metric service to fall into rule above
+- [x] remove `UpdateMetric` method entirely
 
 Also, an important point is that we are handling only **SCALAR** metrics currently. It's not intended state of the project but for now we are cleaning up everything to make sure it works with scalars nicely.
+
+# Steps to make sure that systems lives on the internet
+- [ ] Auth. Research this [post](https://eli.thegreenplace.net/2021/rest-servers-in-go-part-6-authentication/)
+- [ ] TLS. Make sure that we bind port inside of the system. [post](https://eli.thegreenplace.net/2021/go-https-servers-with-tls/)
+- [ ] Request logging
+- [ ] Beautify the interface of `handler` functions
+- [ ] migrate `meth serve` to the normal binary
+- [ ] graceful shutdown for the `methd` binary. now we don't handle any signal
+- [ ] Linux build via `make` command
+- [ ] `systemd` unit (should we include it or we make sure that this is responsibility of the user?)
+- [ ] think about the behaviour with values. for now we support scalar values only, we can work with period values too. correct behaviour on deletion.
+- [ ] migrations for schema changes
 
 
 # Open questions
